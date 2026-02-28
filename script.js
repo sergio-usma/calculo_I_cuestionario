@@ -1,8 +1,7 @@
 // ------------------------------------------------------------
 // CONSTANTES DE CONFIGURACIÓN GLOBAL
 // ------------------------------------------------------------
-const LIMIT_MIN = -20;
-const LIMIT_MAX = 20;
+const MAX_ABS = 50; // Límite absoluto para ambos ejes
 const PRECISION = 2;
 
 // ------------------------------------------------------------
@@ -272,7 +271,7 @@ function generarPreguntasParaEjercicio(ex) {
 
     // Afirmaciones de verdadero/falso (sin inyectividad)
     let afirmaciones = [
-      { texto: `El dominio es ${dom}`, correcta: 0 }, // 0 significa verdadero (la afirmación es correcta)
+      { texto: `El dominio es ${dom}`, correcta: 0 },
       { texto: `El rango es ${ran}`, correcta: 0 },
       { texto: `El punto de corte con X es ${cx}`, correcta: 0 },
       { texto: `El punto de corte con Y es ${cy}`, correcta: 0 },
@@ -336,6 +335,9 @@ function cargarEjercicio() {
   respuestasUsuario = new Array(preguntasActuales.length).fill(null);
   document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
+
+  // Generar la gráfica automáticamente
+  generarGrafica();
 }
 
 function renderizarPreguntas() {
@@ -531,19 +533,96 @@ function calcularPuntosNotables(ex) {
 }
 
 /**
- * Calcula un rango visual óptimo basado en puntos críticos.
+ * Calcula un rango dinámico para el eje X basado en puntos notables y el dominio.
  */
-function calcularLimitesVisuales(puntos) {
-  if (puntos.length === 0) return { min: -10, max: 10 };
+function calcularLimitesX(ex, puntosNotables) {
+  // Recolectar puntos de interés
+  let xs = [];
 
-  let xs = puntos.map(p => p.x).filter(x => isFinite(x));
-  let minX = Math.min(...xs) - 2;
-  let maxX = Math.max(...xs) + 2;
+  // Puntos notables
+  puntosNotables.forEach(p => xs.push(p.x));
 
-  // Aplicar restricciones de -20 a 20
+  // Asegurar que el origen esté considerado
+  xs.push(0);
+
+  // Puntos del dominio relevantes
+  if (ex.tipo === 'sqrt') {
+    xs.push(ex.a);
+  }
+  if (ex.tipo === 'relacion' && ex.forma === 'circulo') {
+    let r = Math.sqrt(ex.r2);
+    xs.push(-r, r);
+  }
+  if (ex.tipo === 'relacion' && ex.forma.includes('y2')) {
+    let a = ex.forma === 'y2 = x+1' ? -1 : 1;
+    xs.push(a);
+  }
+
+  // Filtrar valores no finitos
+  xs = xs.filter(x => isFinite(x) && !isNaN(x));
+
+  if (xs.length === 0) {
+    return { min: -10, max: 10 };
+  }
+
+  let minX = Math.min(...xs);
+  let maxX = Math.max(...xs);
+
+  // Añadir margen (20% o al menos 2 unidades)
+  let padding = Math.max(2, (maxX - minX) * 0.2);
+  minX -= padding;
+  maxX += padding;
+
+  // Asegurar un ancho mínimo de 10 unidades
+  if (maxX - minX < 10) {
+    let center = (minX + maxX) / 2;
+    minX = center - 5;
+    maxX = center + 5;
+  }
+
+  // Limitar a un rango sensato para evitar zoom excesivo
+  minX = Math.max(-MAX_ABS, minX);
+  maxX = Math.min(MAX_ABS, maxX);
+
+  // Redondear para consistencia
   return {
-    min: Math.max(LIMIT_MIN, redondear(minX)),
-    max: Math.min(LIMIT_MAX, redondear(maxX))
+    min: redondear(minX),
+    max: redondear(maxX)
+  };
+}
+
+/**
+ * Calcula un rango dinámico para el eje Y basado en los datos de la función.
+ */
+function calcularLimitesY(dataPrincipal, dataNegativa) {
+  let ys = [];
+  dataPrincipal.forEach(p => ys.push(p.y));
+  dataNegativa.forEach(p => ys.push(p.y));
+  
+  if (ys.length === 0) return { min: -10, max: 10 };
+
+  let minY = Math.min(...ys);
+  let maxY = Math.max(...ys);
+
+  // Añadir margen (20% o al menos 2 unidades)
+  let padding = Math.max(2, (maxY - minY) * 0.2);
+  minY -= padding;
+  maxY += padding;
+
+  // Asegurar un ancho mínimo de 10 unidades
+  if (maxY - minY < 10) {
+    let center = (minY + maxY) / 2;
+    minY = center - 5;
+    maxY = center + 5;
+  }
+
+  // Limitar a ±MAX_ABS
+  minY = Math.max(-MAX_ABS, minY);
+  maxY = Math.min(MAX_ABS, maxY);
+
+  return {
+    min: redondear(minY),
+    max: redondear(maxY)
   };
 }
 
@@ -563,16 +642,16 @@ function generarGrafica() {
   }
 
   const puntosNotables = calcularPuntosNotables(ex);
-  const limites = calcularLimitesVisuales(puntosNotables);
+  const limitesX = calcularLimitesX(ex, puntosNotables);
 
   let dataPrincipal = [];
   let dataNegativa = [];
 
   const pasos = 400;
-  const delta = (limites.max - limites.min) / pasos;
+  const delta = (limitesX.max - limitesX.min) / pasos;
 
   for (let i = 0; i <= pasos; i++) {
-    let x = limites.min + i * delta;
+    let x = limitesX.min + i * delta;
     let y = null;
     let yNeg = null;
 
@@ -615,13 +694,21 @@ function generarGrafica() {
       }
     } catch (e) { y = null; }
 
-    if (y !== null && isFinite(y) && y >= LIMIT_MIN && y <= LIMIT_MAX) {
+    // Solo almacenamos valores finitos (sin límite de Y aquí, se usará para calcular los límites después)
+    if (y !== null && isFinite(y)) {
       dataPrincipal.push({ x: redondear(x), y: redondear(y) });
     }
-    if (yNeg !== null && isFinite(yNeg) && yNeg >= LIMIT_MIN && yNeg <= LIMIT_MAX) {
+    if (yNeg !== null && isFinite(yNeg)) {
       dataNegativa.push({ x: redondear(x), y: redondear(yNeg) });
     }
   }
+
+  // Calcular límites Y basados en los datos generados
+  const limitesY = calcularLimitesY(dataPrincipal, dataNegativa);
+
+  // Filtrar puntos que quedarán fuera del rango Y después de calcular límites
+  dataPrincipal = dataPrincipal.filter(p => p.y >= limitesY.min && p.y <= limitesY.max);
+  dataNegativa = dataNegativa.filter(p => p.y >= limitesY.min && p.y <= limitesY.max);
 
   const datasets = [{
     label: 'f(x)',
@@ -649,7 +736,7 @@ function generarGrafica() {
   // Puntos notables
   if (puntosNotables.length > 0) {
     const puntosVisibles = puntosNotables
-      .filter(p => p.y >= LIMIT_MIN && p.y <= LIMIT_MAX)
+      .filter(p => p.y >= limitesY.min && p.y <= limitesY.max)
       .map(p => ({ x: redondear(p.x), y: redondear(p.y) }));
     if (puntosVisibles.length > 0) {
       datasets.push({
@@ -671,8 +758,8 @@ function generarGrafica() {
       scales: {
         x: {
           type: 'linear',
-          min: limites.min,
-          max: limites.max,
+          min: limitesX.min,
+          max: limitesX.max,
           grid: {
             color: context => context.tick.value === 0 ? '#000' : '#e5e5e5',
             lineWidth: context => context.tick.value === 0 ? 2 : 1
@@ -681,8 +768,8 @@ function generarGrafica() {
         },
         y: {
           type: 'linear',
-          min: LIMIT_MIN,
-          max: LIMIT_MAX,
+          min: limitesY.min,
+          max: limitesY.max,
           grid: {
             color: context => context.tick.value === 0 ? '#000' : '#e5e5e5',
             lineWidth: context => context.tick.value === 0 ? 2 : 1
