@@ -424,4 +424,8 @@ footer a:hover {
   .titulo {
     font-size: 1.6rem;
   }
+
+  .funcion-math {
+  font-size: 1.5rem;
+}
 }
