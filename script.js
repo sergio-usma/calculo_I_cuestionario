@@ -1,4 +1,11 @@
 // ------------------------------------------------------------
+// CONSTANTES DE CONFIGURACIÓN GLOBAL
+// ------------------------------------------------------------
+const LIMIT_MIN = -20;
+const LIMIT_MAX = 20;
+const PRECISION = 2;
+
+// ------------------------------------------------------------
 // VARIABLES GLOBALES
 // ------------------------------------------------------------
 let ejercicios = [];
@@ -7,36 +14,30 @@ let respuestasUsuario = [];
 let chartInstance = null;
 
 // ------------------------------------------------------------
+// FUNCIÓN DE REDONDEO
+// ------------------------------------------------------------
+function redondear(num) {
+  return parseFloat(num.toFixed(PRECISION));
+}
+
+// ------------------------------------------------------------
 // CARGA DE EJERCICIOS DESDE JSON
 // ------------------------------------------------------------
 async function cargarEjercicios() {
   try {
     const response = await fetch('ejercicios.json');
     ejercicios = await response.json();
-    // Asignar id secuencial (por si acaso)
     ejercicios.forEach((ex, idx) => ex.id = idx);
-    cargarSelector();
-    cargarEjercicio();
   } catch (error) {
     console.error('Error cargando ejercicios:', error);
-    // Fallback: usar generación interna si falla el fetch
-    ejercicios = generarEjerciciosFallback();
-    cargarSelector();
-    cargarEjercicio();
+    ejercicios = [];
   }
-}
-
-// Función de respaldo por si no se puede cargar el JSON
-function generarEjerciciosFallback() {
-  // Aquí iría la misma función de generación de los 50 ejercicios
-  // Por brevedad, omito el código (es el mismo que se usaba antes)
-  // En la implementación real, se incluiría la función completa.
-  // Para este ejemplo, retornamos un array vacío (no debería ocurrir)
-  return [];
+  cargarSelector();
+  cargarEjercicio();
 }
 
 // ------------------------------------------------------------
-// FUNCIONES DE CÁLCULO (igual que antes, con toFixed(1))
+// FUNCIONES DE CÁLCULO (con toFixed(1) para mostrar)
 // ------------------------------------------------------------
 function obtenerCorteX(ex) {
   try {
@@ -170,91 +171,48 @@ function obtenerRango(ex) {
   return "ℝ";
 }
 
-function obtenerSimetria(ex) {
-  if (ex.tipo === 'producto') return 3;
-  if (ex.tipo === 'relacion' && ex.forma === 'circulo') return 2;
-  if (ex.tipo === 'lineal' && ex.m === 0) return 3;
-  if (ex.tipo === 'quad') {
-    if (ex.h !== undefined && ex.h === 0) return 1;
-    if (ex.b === 0) return 1;
-  }
-  if (ex.tipo === 'abs' && ex.h === 0) return 1;
-  return 3;
-}
-
-function obtenerMonotonia(ex) {
-  if (ex.tipo === 'producto') return 3;
-  if (ex.tipo === 'lineal') {
-    if (ex.m > 0) return 0;
-    if (ex.m < 0) return 1;
-    return 2;
-  }
-  if (ex.tipo === 'quad') return 3;
-  if (ex.tipo === 'sqrt') return ex.reflexion ? 1 : 0;
-  if (ex.tipo === 'exp') return 0;
-  if (ex.tipo === 'abs') return 3;
-  return 3;
-}
-
 function esFuncion(ex) {
   if (ex.tipo === 'relacion' && (ex.forma === 'circulo' || ex.forma.includes('y2'))) return 1;
   if (ex.tipo === 'producto') return 1;
   return 0;
 }
 
-function esTotal(ex) {
-  if (ex.tipo === 'sqrt' || ex.tipo === 'relacion' || ex.tipo === 'producto') return 1;
-  return 0;
-}
-
-function esInyectiva(ex) {
-  if (ex.tipo === 'lineal' && ex.m !== 0) return 0;
-  if (ex.tipo === 'quad') return 1;
-  if (ex.tipo === 'abs') return 1;
-  if (ex.tipo === 'sqrt') return 0;
-  if (ex.tipo === 'exp') return 0;
-  return 0;
-}
-
-function generarVerdaderoFalso(ex) {
-  let dom = obtenerDominio(ex);
-  let ran = obtenerRango(ex);
-  let cx = obtenerCorteX(ex);
-  let cy = obtenerCorteY(ex);
-  let func = esFuncion(ex) === 0 ? "Sí" : "No";
-  return [
-    { texto: `El dominio es ${dom}`, correcta: 0 },
-    { texto: `El rango es ${ran}`, correcta: 0 },
-    { texto: `El punto de corte con X es ${cx}`, correcta: 0 },
-    { texto: `El punto de corte con Y es ${cy}`, correcta: 0 },
-    { texto: `¿Es función? ${func}`, correcta: esFuncion(ex) },
-    { texto: `La función es inyectiva`, correcta: esInyectiva(ex) }
-  ];
+function obtenerVertice(ex) {
+  if (ex.tipo !== 'quad') return null;
+  try {
+    if (ex.h !== undefined) {
+      return `(${ex.h.toFixed(1)}, ${ex.k.toFixed(1)})`;
+    } else {
+      let a = ex.a, b = ex.b, c = ex.c;
+      let xv = -b / (2 * a);
+      let yv = a * xv * xv + b * xv + c;
+      return `(${xv.toFixed(1)}, ${yv.toFixed(1)})`;
+    }
+  } catch {
+    return null;
+  }
 }
 
 // ------------------------------------------------------------
-// GENERAR PREGUNTAS (SOLO SECCIONES 1-4)
+// GENERAR PREGUNTAS (solo temas vistos)
 // ------------------------------------------------------------
 function generarPreguntasParaEjercicio(ex) {
   let preguntas = [];
 
   if (ex.tipo === 'producto') {
     preguntas.push({
-      seccion: "SECCIÓN 1 — Producto cartesiano",
       texto: "Cardinalidad de A × B",
       opciones: [ex.A.length * ex.B.length + "", "|A|+|B|", "|A|", "|B|"],
       correcta: 0,
       explicacion: `A tiene ${ex.A.length} elementos, B tiene ${ex.B.length}. |A×B| = ${ex.A.length} × ${ex.B.length} = ${ex.A.length * ex.B.length}.`
     });
     preguntas.push({
-      seccion: "SECCIÓN 1",
       texto: "¿El par (0,2) ∈ A × B?",
       opciones: ["Verdadero", "Falso"],
       correcta: (ex.A.includes(0) && ex.B.includes(2)) ? 0 : 1,
       explicacion: (ex.A.includes(0) && ex.B.includes(2)) ? "0 ∈ A y 2 ∈ B, por tanto pertenece." : "0 no está en A o 2 no está en B."
     });
     preguntas.push({
-      seccion: "SECCIÓN 1",
       texto: "A ⊆ B",
       opciones: ["V", "F"],
       correcta: ex.A.every(v => ex.B.includes(v)) ? 0 : 1,
@@ -263,87 +221,69 @@ function generarPreguntasParaEjercicio(ex) {
   } else {
     let cx = obtenerCorteX(ex);
     let cy = obtenerCorteY(ex);
-    let sim = obtenerSimetria(ex);
-    let mon = obtenerMonotonia(ex);
-    let func = esFuncion(ex);
     let dom = obtenerDominio(ex);
     let ran = obtenerRango(ex);
-    let total = esTotal(ex);
-    let iny = esInyectiva(ex);
+    let func = esFuncion(ex);
 
+    // Preguntas básicas
     preguntas.push({
-      seccion: "SECCIÓN 1 — Construcción",
       texto: "Punto de corte con eje X",
       opciones: [cx, "(0,0)", "No hay", "(1,0)"],
       correcta: 0,
       explicacion: `Para hallar corte con X, hacemos y=0. Resolviendo se obtiene: ${cx}.`
     });
     preguntas.push({
-      seccion: "SECCIÓN 1",
       texto: "Punto de corte con eje Y",
       opciones: [cy, "(0,0)", "No hay", "(0,1)"],
       correcta: 0,
       explicacion: `Para hallar corte con Y, hacemos x=0. Se obtiene: ${cy}.`
     });
     preguntas.push({
-      seccion: "SECCIÓN 1",
-      texto: "Simetría respecto a",
-      opciones: ["Eje X", "Eje Y", "Origen", "Ninguna"],
-      correcta: sim,
-      explicacion: ["Simetría respecto al eje X", "Simetría respecto al eje Y", "Simetría respecto al origen", "No presenta simetría"][sim]
-    });
-    preguntas.push({
-      seccion: "SECCIÓN 1",
-      texto: "Comportamiento (monotonía)",
-      opciones: ["Creciente", "Decreciente", "Constante", "No monótona"],
-      correcta: mon,
-      explicacion: ["La función es creciente en su dominio.", "La función es decreciente.", "Es constante.", "No es monótona (cambia crecimiento)."][mon]
-    });
-    preguntas.push({
-      seccion: "SECCIÓN 1",
-      texto: "¿Representa una función?",
-      opciones: ["Sí", "No"],
-      correcta: func,
-      explicacion: func === 0 ? "Cada x tiene una única imagen." : "Hay valores de x con dos imágenes posibles."
-    });
-
-    preguntas.push({
-      seccion: "SECCIÓN 2 — Dominio y rango",
       texto: "Dominio (intervalo)",
       opciones: [dom, "ℝ", "[0,∞)", "(-∞,0]"],
       correcta: 0,
       explicacion: `El dominio es ${dom}.`
     });
     preguntas.push({
-      seccion: "SECCIÓN 2",
       texto: "Rango (intervalo)",
       opciones: [ran, "ℝ", "[0,∞)", "(-∞,0]"],
       correcta: 0,
       explicacion: `El rango es ${ran}.`
     });
-
     preguntas.push({
-      seccion: "SECCIÓN 3 — Definición formal",
-      texto: "¿Es una función total respecto a ℝ?",
+      texto: "¿Representa una función?",
       opciones: ["Sí", "No"],
-      correcta: total,
-      explicacion: total === 0 ? "Está definida para todo ℝ." : "No está definida en todo ℝ."
-    });
-    preguntas.push({
-      seccion: "SECCIÓN 3",
-      texto: "¿Es inyectiva?",
-      opciones: ["Sí", "No"],
-      correcta: iny,
-      explicacion: iny === 0 ? "Valores distintos de x dan imágenes distintas." : "Hay valores de x distintos con la misma imagen."
+      correcta: func,
+      explicacion: func === 0 ? "Cada x tiene una única imagen." : "Hay valores de x con dos imágenes posibles."
     });
 
-    let vf = generarVerdaderoFalso(ex);
-    vf.forEach((item, i) => {
+    // Pregunta adicional para cuadráticas: vértice
+    if (ex.tipo === 'quad') {
+      let vertice = obtenerVertice(ex);
+      if (vertice) {
+        preguntas.push({
+          texto: "Coordenadas del vértice",
+          opciones: [vertice, "(0,0)", "No tiene vértice", "(1,1)"],
+          correcta: 0,
+          explicacion: `El vértice de la parábola es ${vertice}.`
+        });
+      }
+    }
+
+    // Afirmaciones de verdadero/falso (sin inyectividad)
+    let afirmaciones = [
+      { texto: `El dominio es ${dom}`, correcta: 0 }, // 0 significa verdadero (la afirmación es correcta)
+      { texto: `El rango es ${ran}`, correcta: 0 },
+      { texto: `El punto de corte con X es ${cx}`, correcta: 0 },
+      { texto: `El punto de corte con Y es ${cy}`, correcta: 0 },
+      { texto: `¿Es función? ${func === 0 ? 'Sí' : 'No'}`, correcta: func }
+    ];
+
+    afirmaciones.forEach(af => {
       preguntas.push({
-        seccion: "SECCIÓN 4 — Verdadero/Falso",
-        texto: item.texto,
+        texto: af.texto,
         opciones: ["V", "F"],
-        correcta: item.correcta,
+        correcta: af.correcta,
         explicacion: "Afirmación basada en las propiedades calculadas."
       });
     });
@@ -352,21 +292,23 @@ function generarPreguntasParaEjercicio(ex) {
 }
 
 // ------------------------------------------------------------
-// FUNCIONES DE INTERFAZ
+// INTERFAZ DE USUARIO
 // ------------------------------------------------------------
 function cargarSelector() {
   let select = document.getElementById('exerciseSelect');
+  if (!select) return;
   select.innerHTML = '';
   ejercicios.forEach((_, i) => {
     let opt = document.createElement('option');
     opt.value = i;
-    opt.textContent = `Ejercicio #${String(i+1).padStart(2,'0')}`;
+    opt.textContent = `Ejercicio #${String(i+1).padStart(2, '0')}`;
     select.appendChild(opt);
   });
 }
 
 function cargarEjercicio() {
   let idx = parseInt(document.getElementById('exerciseSelect').value) || 0;
+  if (ejercicios.length === 0) return;
   let ex = ejercicios[idx];
   document.getElementById('mathDisplay').innerHTML = `\\( ${ex.latex} \\)`;
   if (window.MathJax) MathJax.typesetPromise();
@@ -376,13 +318,13 @@ function cargarEjercicio() {
     let opciones = [...p.opciones];
     let correctaOriginal = p.correcta;
     let valorCorrecto = opciones[correctaOriginal];
+    // Mezclar opciones
     for (let i = opciones.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [opciones[i], opciones[j]] = [opciones[j], opciones[i]];
     }
     let nuevoIndiceCorrecto = opciones.indexOf(valorCorrecto);
     return {
-      seccion: p.seccion,
       texto: p.texto,
       opciones: opciones,
       correcta: nuevoIndiceCorrecto,
@@ -392,37 +334,37 @@ function cargarEjercicio() {
 
   renderizarPreguntas();
   respuestasUsuario = new Array(preguntasActuales.length).fill(null);
-  document.getElementById('globalResult').classList.add('d-none');
+  document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
 }
 
 function renderizarPreguntas() {
   const container = document.getElementById('quizContainer');
+  if (!container) return;
   container.innerHTML = '';
 
   preguntasActuales.forEach((p, idx) => {
-    const col = document.createElement('div');
-    col.className = 'col-md-6';
-    const card = document.createElement('div');
-    card.className = 'pregunta-card';
-    card.id = `card-${idx}`;
+    const item = document.createElement('div');
+    item.className = 'pregunta-item';
+    item.id = `pregunta-${idx}`;
+
     let opcionesHtml = '';
     p.opciones.forEach((opt, oIdx) => {
       opcionesHtml += `
-        <div class="form-check mb-2">
+        <div class="form-check">
           <input class="form-check-input" type="radio" name="preg_${idx}" id="radio_${idx}_${oIdx}" value="${oIdx}" onchange="guardarRespuesta(${idx}, ${oIdx})">
-          <label class="form-check-label w-100" for="radio_${idx}_${oIdx}">${opt}</label>
+          <label class="form-check-label" for="radio_${idx}_${oIdx}">${opt}</label>
         </div>
       `;
     });
-    card.innerHTML = `
-      <p class="fw-bold mb-3">${p.seccion}</p>
-      <p>${p.texto}</p>
-      <div class="options-list">${opcionesHtml}</div>
-      <div id="feedback-${idx}" class="mt-2"></div>
+
+    item.innerHTML = `
+      <div class="pregunta-numero">Pregunta ${idx + 1}</div>
+      <div class="pregunta-enunciado">${p.texto}</div>
+      <div class="opciones-list">${opcionesHtml}</div>
+      <div id="feedback-${idx}" class="feedback"></div>
     `;
-    col.appendChild(card);
-    container.appendChild(col);
+    container.appendChild(item);
   });
 }
 
@@ -435,23 +377,27 @@ function verificarTodo() {
   preguntasActuales.forEach((p, idx) => {
     let seleccion = respuestasUsuario[idx];
     let feedback = document.getElementById(`feedback-${idx}`);
-    let card = document.getElementById(`card-${idx}`);
+    let item = document.getElementById(`pregunta-${idx}`);
     if (seleccion === null) {
-      feedback.innerHTML = `<div class="text-danger small fw-bold"><i class="bi bi-x-circle"></i> Sin responder</div>`;
-      card.style.borderLeftColor = 'var(--danger)';
+      feedback.className = 'feedback incorrecto';
+      feedback.innerHTML = `<i class="bi bi-x-circle"></i> Sin responder`;
+      item.style.borderLeftColor = 'var(--danger)';
     } else if (seleccion === p.correcta) {
-      feedback.innerHTML = `<div class="text-success small fw-bold"><i class="bi bi-check-circle"></i> Correcto</div><div class="explicacion">${p.explicacion}</div>`;
-      card.style.borderLeftColor = 'var(--success)';
+      feedback.className = 'feedback correcto';
+      feedback.innerHTML = `<i class="bi bi-check-circle"></i> Correcto<div class="explicacion">${p.explicacion}</div>`;
+      item.style.borderLeftColor = 'var(--success)';
       correctas++;
     } else {
-      feedback.innerHTML = `<div class="text-danger small fw-bold"><i class="bi bi-x-circle"></i> Incorrecto. La respuesta era: ${p.opciones[p.correcta]}</div><div class="explicacion">${p.explicacion}</div>`;
-      card.style.borderLeftColor = 'var(--danger)';
+      feedback.className = 'feedback incorrecto';
+      feedback.innerHTML = `<i class="bi bi-x-circle"></i> Incorrecto. La respuesta correcta es: ${p.opciones[p.correcta]}<div class="explicacion">${p.explicacion}</div>`;
+      item.style.borderLeftColor = 'var(--danger)';
     }
   });
 
   let total = preguntasActuales.length;
-  let porcentaje = Math.round(correctas/total*100);
+  let porcentaje = Math.round(correctas / total * 100);
   let globalDiv = document.getElementById('globalResult');
+  if (!globalDiv) return;
   globalDiv.className = `alert d-block mt-5 text-center shadow-lg border-0 py-4 ${correctas === total ? 'alert-success' : 'alert-info'}`;
   globalDiv.innerHTML = `<h4>Resultado: ${correctas} / ${total} (${porcentaje}%)</h4><p class="mb-0">Sigue practicando para perfeccionar tu análisis funcional.</p>`;
   globalDiv.classList.remove('d-none');
@@ -459,105 +405,299 @@ function verificarTodo() {
 }
 
 function actualizarProgreso(correctas) {
-  document.getElementById('progressBadge').innerText = `${correctas} / 50`;
+  let badge = document.getElementById('progressBadge');
+  if (badge) badge.innerText = `${correctas} / 50`;
 }
 
 function reiniciarTodo() {
   respuestasUsuario.fill(null);
   document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
-  document.querySelectorAll('[id^="feedback-"]').forEach(el => el.innerHTML = '');
-  document.querySelectorAll('.pregunta-card').forEach(card => card.style.borderLeftColor = 'var(--primary)');
-  document.getElementById('globalResult').classList.add('d-none');
+  document.querySelectorAll('[id^="feedback-"]').forEach(el => {
+    el.className = 'feedback';
+    el.innerHTML = '';
+  });
+  document.querySelectorAll('.pregunta-item').forEach(item => item.style.borderLeftColor = 'var(--primary)');
+  document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
+}
+
+// ------------------------------------------------------------
+// FUNCIONES AUXILIARES PARA GRÁFICAS MEJORADAS
+// ------------------------------------------------------------
+function calcularPuntosNotables(ex) {
+  let puntos = [];
+  try {
+    if (ex.tipo === 'producto') return puntos;
+    if (ex.tipo === 'relacion') {
+      if (ex.forma === 'circulo') {
+        let r = Math.sqrt(ex.r2);
+        puntos.push({ x: r, y: 0, label: `(${r.toFixed(2)},0)` });
+        puntos.push({ x: -r, y: 0, label: `(${-r.toFixed(2)},0)` });
+        puntos.push({ x: 0, y: r, label: `(0,${r.toFixed(2)})` });
+        puntos.push({ x: 0, y: -r, label: `(0,${-r.toFixed(2)})` });
+      } else if (ex.forma.includes('y2')) {
+        let a = ex.forma === 'y2 = x+1' ? -1 : 1;
+        puntos.push({ x: a, y: 0, label: `(${a},0)` });
+        if (a <= 0) {
+          let y = Math.sqrt(-a);
+          puntos.push({ x: 0, y: y, label: `(0,${y.toFixed(2)})` });
+          puntos.push({ x: 0, y: -y, label: `(0,${-y.toFixed(2)})` });
+        }
+      }
+      return puntos;
+    }
+    if (ex.tipo === 'sqrt') {
+      let x0 = ex.a;
+      let y0 = ex.desplazamientoV || 0;
+      puntos.push({ x: x0, y: y0, label: `(${x0},${y0})` });
+      let rad = ex.reflexion ? ex.a - 0 : 0 - ex.a;
+      if (rad >= 0) {
+        let y = Math.sqrt(rad) + y0;
+        puntos.push({ x: 0, y: y, label: `(0,${y.toFixed(2)})` });
+      }
+      return puntos;
+    }
+    if (ex.tipo === 'lineal') {
+      if (ex.m !== 0) {
+        let x = -ex.b / ex.m;
+        puntos.push({ x: x, y: 0, label: `(${x.toFixed(2)},0)` });
+      }
+      puntos.push({ x: 0, y: ex.b, label: `(0,${ex.b})` });
+      return puntos;
+    }
+    if (ex.tipo === 'quad') {
+      if (ex.h !== undefined) {
+        let xv = ex.h;
+        let yv = ex.k;
+        puntos.push({ x: xv, y: yv, label: `Vértice (${xv.toFixed(2)},${yv.toFixed(2)})` });
+        if (ex.a !== 0) {
+          let disc = -ex.k / ex.a;
+          if (disc > 0) {
+            let sqrtDisc = Math.sqrt(disc);
+            puntos.push({ x: xv - sqrtDisc, y: 0, label: `(${(xv - sqrtDisc).toFixed(2)},0)` });
+            puntos.push({ x: xv + sqrtDisc, y: 0, label: `(${(xv + sqrtDisc).toFixed(2)},0)` });
+          } else if (disc === 0) {
+            puntos.push({ x: xv, y: 0, label: `(${xv.toFixed(2)},0)` });
+          }
+        }
+        let y0 = ex.a * (0 - ex.h) ** 2 + ex.k;
+        puntos.push({ x: 0, y: y0, label: `(0,${y0.toFixed(2)})` });
+      } else {
+        let a = ex.a, b = ex.b, c = ex.c;
+        let xv = -b / (2 * a);
+        let yv = a * xv * xv + b * xv + c;
+        puntos.push({ x: xv, y: yv, label: `Vértice (${xv.toFixed(2)},${yv.toFixed(2)})` });
+        let disc = b * b - 4 * a * c;
+        if (disc > 0) {
+          let sqrtDisc = Math.sqrt(disc);
+          puntos.push({ x: (-b - sqrtDisc) / (2 * a), y: 0, label: `(${((-b - sqrtDisc) / (2 * a)).toFixed(2)},0)` });
+          puntos.push({ x: (-b + sqrtDisc) / (2 * a), y: 0, label: `(${((-b + sqrtDisc) / (2 * a)).toFixed(2)},0)` });
+        } else if (disc === 0) {
+          puntos.push({ x: -b / (2 * a), y: 0, label: `(${(-b / (2 * a)).toFixed(2)},0)` });
+        }
+        puntos.push({ x: 0, y: c, label: `(0,${c})` });
+      }
+      return puntos;
+    }
+    if (ex.tipo === 'exp') {
+      let asintota = ex.desplazamientoV || 0;
+      let base = ex.base === 'e' ? Math.E : ex.base;
+      let y0 = Math.pow(base, -ex.a) + asintota;
+      puntos.push({ x: 0, y: y0, label: `(0,${y0.toFixed(2)})` });
+      return puntos;
+    }
+    if (ex.tipo === 'abs') {
+      let a = ex.a, h = ex.h, k = ex.k;
+      puntos.push({ x: h, y: k, label: `Vértice (${h.toFixed(2)},${k.toFixed(2)})` });
+      if (a !== 0) {
+        let d = Math.abs(-k / a);
+        if (d >= 0) {
+          if (k === 0) {
+            puntos.push({ x: h, y: 0, label: `(${h.toFixed(2)},0)` });
+          } else if (d > 0) {
+            puntos.push({ x: h - d, y: 0, label: `(${(h - d).toFixed(2)},0)` });
+            puntos.push({ x: h + d, y: 0, label: `(${(h + d).toFixed(2)},0)` });
+          }
+        }
+      }
+      let y0 = a * Math.abs(0 - h) + k;
+      puntos.push({ x: 0, y: y0, label: `(0,${y0.toFixed(2)})` });
+      return puntos;
+    }
+  } catch (e) {
+    console.error("Error calculando puntos notables", e);
+  }
+  return puntos;
+}
+
+/**
+ * Calcula un rango visual óptimo basado en puntos críticos.
+ */
+function calcularLimitesVisuales(puntos) {
+  if (puntos.length === 0) return { min: -10, max: 10 };
+
+  let xs = puntos.map(p => p.x).filter(x => isFinite(x));
+  let minX = Math.min(...xs) - 2;
+  let maxX = Math.max(...xs) + 2;
+
+  // Aplicar restricciones de -20 a 20
+  return {
+    min: Math.max(LIMIT_MIN, redondear(minX)),
+    max: Math.min(LIMIT_MAX, redondear(maxX))
+  };
 }
 
 function generarGrafica() {
   let idx = parseInt(document.getElementById('exerciseSelect').value) || 0;
+  if (ejercicios.length === 0) return;
   let ex = ejercicios[idx];
-  let ctx = document.getElementById('mainChart').getContext('2d');
+  let canvas = document.getElementById('mainChart');
+  if (!canvas) return;
+  let ctx = canvas.getContext('2d');
+
   if (chartInstance) chartInstance.destroy();
 
   if (ex.tipo === 'producto') {
-    alert('Ejercicio de producto cartesiano: no hay gráfica continua.');
+    alert('Análisis de conjunto: A × B son puntos aislados.');
     return;
   }
 
-  let rango = [-5, 5];
-  if (ex.tipo === 'sqrt') {
-    if (ex.reflexion) rango = [ex.a - 5, ex.a + 2];
-    else rango = [ex.a - 2, ex.a + 8];
-  } else if (ex.tipo === 'relacion' && ex.forma === 'circulo') {
-    let radio = Math.sqrt(ex.r2);
-    rango = [-radio - 1, radio + 1];
-  }
+  const puntosNotables = calcularPuntosNotables(ex);
+  const limites = calcularLimitesVisuales(puntosNotables);
 
-  let labels = [];
-  let data = [];
-  for (let i = 0; i <= 200; i++) {
-    let x = rango[0] + i * (rango[1] - rango[0]) / 200;
-    labels.push(x);
+  let dataPrincipal = [];
+  let dataNegativa = [];
+
+  const pasos = 400;
+  const delta = (limites.max - limites.min) / pasos;
+
+  for (let i = 0; i <= pasos; i++) {
+    let x = limites.min + i * delta;
+    let y = null;
+    let yNeg = null;
+
     try {
-      if (ex.tipo === 'sqrt') {
-        let val = ex.reflexion ? ex.a - x : x - ex.a;
-        data.push(val >= 0 ? Math.sqrt(val) + (ex.desplazamientoV||0) : null);
-      } else if (ex.tipo === 'quad') {
-        if (ex.h !== undefined) data.push(ex.a * (x - ex.h)**2 + ex.k);
-        else data.push(ex.a * x*x + ex.b*x + ex.c);
-      } else if (ex.tipo === 'lineal') {
-        data.push(ex.m * x + ex.b);
-      } else if (ex.tipo === 'exp') {
-        let base = ex.base === 'e' ? Math.E : ex.base;
-        data.push(Math.pow(base, x - ex.a) + (ex.desplazamientoV||0));
-      } else if (ex.tipo === 'abs') {
-        data.push(ex.a * Math.abs(x - ex.h) + ex.k);
-      } else if (ex.tipo === 'relacion') {
-        if (ex.forma === 'circulo') {
-          let r = Math.sqrt(ex.r2);
-          data.push(Math.abs(x) <= r ? Math.sqrt(r*r - x*x) : null);
-        } else if (ex.forma.includes('y2')) {
-          let val = ex.forma === 'y2 = x+1' ? x+1 : x-1;
-          data.push(val >= 0 ? Math.sqrt(val) : null);
-        } else data.push(null);
-      } else data.push(null);
-    } catch { data.push(null); }
+      switch (ex.tipo) {
+        case 'lineal':
+          y = ex.m * x + ex.b;
+          break;
+        case 'quad':
+          y = (ex.h !== undefined)
+            ? ex.a * Math.pow(x - ex.h, 2) + ex.k
+            : ex.a * x * x + ex.b * x + ex.c;
+          break;
+        case 'sqrt':
+          let argumento = ex.reflexion ? ex.a - x : x - ex.a;
+          if (argumento >= 0) y = Math.sqrt(argumento) + (ex.desplazamientoV || 0);
+          break;
+        case 'abs':
+          y = ex.a * Math.abs(x - ex.h) + ex.k;
+          break;
+        case 'exp':
+          let base = ex.base === 'e' ? Math.E : ex.base;
+          y = Math.pow(base, x - ex.a) + (ex.desplazamientoV || 0);
+          break;
+        case 'relacion':
+          if (ex.forma === 'circulo') {
+            let r = Math.sqrt(ex.r2);
+            if (Math.abs(x) <= r) {
+              y = Math.sqrt(r * r - x * x);
+              yNeg = -Math.sqrt(r * r - x * x);
+            }
+          } else if (ex.forma.includes('y2')) {
+            let val = ex.forma === 'y2 = x+1' ? x + 1 : x - 1;
+            if (val >= 0) {
+              y = Math.sqrt(val);
+              yNeg = -Math.sqrt(val);
+            }
+          }
+          break;
+      }
+    } catch (e) { y = null; }
+
+    if (y !== null && isFinite(y) && y >= LIMIT_MIN && y <= LIMIT_MAX) {
+      dataPrincipal.push({ x: redondear(x), y: redondear(y) });
+    }
+    if (yNeg !== null && isFinite(yNeg) && yNeg >= LIMIT_MIN && yNeg <= LIMIT_MAX) {
+      dataNegativa.push({ x: redondear(x), y: redondear(yNeg) });
+    }
   }
 
-  let datasets = [{
-    label: ex.latex,
-    data: data,
+  const datasets = [{
+    label: 'f(x)',
+    data: dataPrincipal,
     borderColor: '#2b6cb0',
-    borderWidth: 3,
+    borderWidth: 2,
+    pointRadius: 0,
+    showLine: true,
     fill: false,
-    tension: 0.4,
-    pointRadius: 0
+    tension: 0.1
   }];
 
-  if (ex.tipo === 'relacion' && ex.forma === 'circulo') {
-    let dataNeg = labels.map((x, i) => {
-      let r = Math.sqrt(ex.r2);
-      return Math.abs(x) <= r ? -Math.sqrt(r*r - x*x) : null;
-    });
+  if (dataNegativa.length > 0) {
     datasets.push({
-      label: 'y = -√',
-      data: dataNeg,
+      label: 'f(x) inf',
+      data: dataNegativa,
       borderColor: '#ed8936',
       borderWidth: 2,
       pointRadius: 0,
-      tension: 0.4
+      showLine: true,
+      fill: false
     });
   }
 
+  // Puntos notables
+  if (puntosNotables.length > 0) {
+    const puntosVisibles = puntosNotables
+      .filter(p => p.y >= LIMIT_MIN && p.y <= LIMIT_MAX)
+      .map(p => ({ x: redondear(p.x), y: redondear(p.y) }));
+    if (puntosVisibles.length > 0) {
+      datasets.push({
+        label: 'Puntos',
+        data: puntosVisibles,
+        backgroundColor: 'red',
+        pointRadius: 5,
+        type: 'scatter'
+      });
+    }
+  }
+
   chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: { labels: labels, datasets: datasets },
+    type: 'scatter',
+    data: { datasets: datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        y: { grid: { color: 'rgba(0,0,0,0.05)' } },
-        x: { grid: { display: false } }
+        x: {
+          type: 'linear',
+          min: limites.min,
+          max: limites.max,
+          grid: {
+            color: context => context.tick.value === 0 ? '#000' : '#e5e5e5',
+            lineWidth: context => context.tick.value === 0 ? 2 : 1
+          },
+          title: { display: true, text: 'Eje X' }
+        },
+        y: {
+          type: 'linear',
+          min: LIMIT_MIN,
+          max: LIMIT_MAX,
+          grid: {
+            color: context => context.tick.value === 0 ? '#000' : '#e5e5e5',
+            lineWidth: context => context.tick.value === 0 ? 2 : 1
+          },
+          title: { display: true, text: 'Eje Y' }
+        }
       },
-      plugins: { legend: { display: false } }
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => `(${item.parsed.x.toFixed(1)}, ${item.parsed.y.toFixed(1)})`
+          }
+        }
+      }
     }
   });
 }
@@ -592,6 +732,6 @@ function initDarkMode() {
 // ------------------------------------------------------------
 window.onload = function() {
   initDarkMode();
-  cargarEjercicios(); // Asíncrono
+  cargarEjercicios();
   document.getElementById('exerciseSelect').addEventListener('change', cargarEjercicio);
 };
