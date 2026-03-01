@@ -631,97 +631,102 @@ function generarPreguntasParaEjercicio(ex) {
   }
 
   if (ex.tipo === 'producto') {
-    let A = ex.A, B = ex.B;
-    let producto = [];
-    A.forEach(a => B.forEach(b => producto.push(`(${a},${b})`)));
+    // Bloque envuelto en try-catch para capturar errores y evitar fallos silenciosos
+    try {
+      let A = ex.A, B = ex.B;
+      let producto = [];
+      A.forEach(a => B.forEach(b => producto.push(`(${a},${b})`)));
 
-    // Cardinalidad de A × B
-    let base1 = [String(A.length * B.length), "|A|+|B|", "|A|", "|B|"];
-    let { opciones: op1, correcta: corr1 } = crearOpciones(base1, String(A.length * B.length));
-    preguntas.push({
-      texto: "Cardinalidad de A × B",
-      opciones: op1,
-      correcta: corr1,
-      explicacion: `A tiene ${A.length} elementos, B tiene ${B.length}. |A×B| = ${A.length} × ${B.length} = ${A.length * B.length}.`
-    });
+      // Cardinalidad de A × B
+      let base1 = [String(A.length * B.length), "|A|+|B|", "|A|", "|B|"];
+      let { opciones: op1, correcta: corr1 } = crearOpciones(base1, String(A.length * B.length));
+      preguntas.push({
+        texto: "Cardinalidad de A × B",
+        opciones: op1,
+        correcta: corr1,
+        explicacion: `A tiene ${A.length} elementos, B tiene ${B.length}. |A×B| = ${A.length} × ${B.length} = ${A.length * B.length}.`
+      });
 
-    // Par sí
-    let parSi = producto[0];
-    let base2 = ["Sí", "No"];
-    let { opciones: op2, correcta: corr2 } = crearOpciones(base2, "Sí");
-    preguntas.push({
-      texto: `¿El par ${parSi} pertenece a A × B?`,
-      opciones: op2,
-      correcta: corr2,
-      explicacion: `Sí, porque se forma con un elemento de A y otro de B.`
-    });
+      // Par sí
+      let parSi = producto[0];
+      let base2 = ["Sí", "No"];
+      let { opciones: op2, correcta: corr2 } = crearOpciones(base2, "Sí");
+      preguntas.push({
+        texto: `¿El par ${parSi} pertenece a A × B?`,
+        opciones: op2,
+        correcta: corr2,
+        explicacion: `Sí, porque se forma con un elemento de A y otro de B.`
+      });
 
-    // B × A (sí)
-    let b0 = B[0], a0 = A[0];
-    let base3 = ["Sí", "No"];
-    let { opciones: op3, correcta: corr3 } = crearOpciones(base3, "Sí");
-    preguntas.push({
-      texto: `¿El par (${b0}, ${a0}) pertenece a B × A?`,
-      opciones: op3,
-      correcta: corr3,
-      explicacion: `Sí, porque ${b0} ∈ B y ${a0} ∈ A.`
-    });
+      // B × A (sí)
+      let b0 = B[0], a0 = A[0];
+      let base3 = ["Sí", "No"];
+      let { opciones: op3, correcta: corr3 } = crearOpciones(base3, "Sí");
+      preguntas.push({
+        texto: `¿El par (${b0}, ${a0}) pertenece a B × A?`,
+        opciones: op3,
+        correcta: corr3,
+        explicacion: `Sí, porque ${b0} ∈ B y ${a0} ∈ A.`
+      });
 
-    // Par que no pertenece a B × A
-    let maxA = Math.max(...A);
-    let noA = maxA + 1;
-    let parNoBA = `(${b0}, ${noA})`;
-    let base4 = ["Sí", "No"];
-    let { opciones: op4, correcta: corr4 } = crearOpciones(base4, "No");
-    preguntas.push({
-      texto: `¿El par ${parNoBA} pertenece a B × A?`,
-      opciones: op4,
-      correcta: corr4,
-      explicacion: `No, porque ${noA} no pertenece a A (A = {${A.join(', ')}}).`
-    });
+      // Par que no pertenece a B × A
+      let maxA = Math.max(...A);
+      let noA = maxA + 1;
+      let parNoBA = `(${b0}, ${noA})`;
+      let base4 = ["Sí", "No"];
+      let { opciones: op4, correcta: corr4 } = crearOpciones(base4, "No");
+      preguntas.push({
+        texto: `¿El par ${parNoBA} pertenece a B × A?`,
+        opciones: op4,
+        correcta: corr4,
+        explicacion: `No, porque ${noA} no pertenece a A (A = {${A.join(', ')}}).`
+      });
 
-    // A ⊆ B
-    let aSubB = A.every(val => B.includes(val));
-    let base5 = ["Sí", "No"];
-    let { opciones: op5, correcta: corr5 } = crearOpciones(base5, aSubB ? "Sí" : "No");
-    preguntas.push({
-      texto: "¿A ⊆ B?",
-      opciones: op5,
-      correcta: corr5,
-      explicacion: aSubB ? "Todos los elementos de A están en B." : "Hay elementos de A que no están en B."
-    });
+      // A ⊆ B
+      let aSubB = A.every(val => B.includes(val));
+      let base5 = ["Sí", "No"];
+      let { opciones: op5, correcta: corr5 } = crearOpciones(base5, aSubB ? "Sí" : "No");
+      preguntas.push({
+        texto: "¿A ⊆ B?",
+        opciones: op5,
+        correcta: corr5,
+        explicacion: aSubB ? "Todos los elementos de A están en B." : "Hay elementos de A que no están en B."
+      });
 
-    // A × B igual a B × A
-    let igual = (A.length === B.length) && A.every(v => B.includes(v)) && B.every(v => A.includes(v));
-    let base6 = ["V", "F"];
-    let { opciones: op6, correcta: corr6 } = crearOpciones(base6, igual ? "V" : "F");
-    preguntas.push({
-      texto: "A × B es igual a B × A",
-      opciones: op6,
-      correcta: corr6,
-      explicacion: igual ? "Los conjuntos son iguales porque A = B." : "El producto cartesiano no es conmutativo, salvo que A = B."
-    });
+      // A × B igual a B × A
+      let igual = (A.length === B.length) && A.every(v => B.includes(v)) && B.every(v => A.includes(v));
+      let base6 = ["V", "F"];
+      let { opciones: op6, correcta: corr6 } = crearOpciones(base6, igual ? "V" : "F");
+      preguntas.push({
+        texto: "A × B es igual a B × A",
+        opciones: op6,
+        correcta: corr6,
+        explicacion: igual ? "Los conjuntos son iguales porque A = B." : "El producto cartesiano no es conmutativo, salvo que A = B."
+      });
 
-    // Representa función
-    let esFunc = (B.length === 1);
-    let base7 = ["V", "F"];
-    let { opciones: op7, correcta: corr7 } = crearOpciones(base7, esFunc ? "V" : "F");
-    preguntas.push({
-      texto: "A × B representa una función de A en B",
-      opciones: op7,
-      correcta: corr7,
-      explicacion: esFunc ? "Cada elemento de A se relaciona con un único elemento de B." : "Cada elemento de A se relaciona con varios elementos de B, por lo que no es función."
-    });
+      // Representa función
+      let esFunc = (B.length === 1);
+      let base7 = ["V", "F"];
+      let { opciones: op7, correcta: corr7 } = crearOpciones(base7, esFunc ? "V" : "F");
+      preguntas.push({
+        texto: "A × B representa una función de A en B",
+        opciones: op7,
+        correcta: corr7,
+        explicacion: esFunc ? "Cada elemento de A se relaciona con un único elemento de B." : "Cada elemento de A se relaciona con varios elementos de B, por lo que no es función."
+      });
 
-    // Cardinalidad de A
-    let base8 = [String(A.length), String(B.length), String(A.length + B.length), String(A.length * B.length)];
-    let { opciones: op8, correcta: corr8 } = crearOpciones(base8, String(A.length));
-    preguntas.push({
-      texto: "Cardinalidad del conjunto A",
-      opciones: op8,
-      correcta: corr8,
-      explicacion: `A tiene ${A.length} elementos.`
-    });
+      // Cardinalidad de A
+      let base8 = [String(A.length), String(B.length), String(A.length + B.length), String(A.length * B.length)];
+      let { opciones: op8, correcta: corr8 } = crearOpciones(base8, String(A.length));
+      preguntas.push({
+        texto: "Cardinalidad del conjunto A",
+        opciones: op8,
+        correcta: corr8,
+        explicacion: `A tiene ${A.length} elementos.`
+      });
+    } catch (e) {
+      console.error("Error generando preguntas para producto:", e);
+    }
 
   } else {
     let cx = obtenerCorteX(ex);
@@ -1101,19 +1106,17 @@ function cargarEjercicio() {
     completedBadge.style.display = completado ? 'inline-block' : 'none';
   }
 
-  // Deshabilitar elementos si está completado
+  // Deshabilitar elementos si está completado (excepto el botón reiniciar)
   const radios = document.querySelectorAll('input[type="radio"]');
   const btnVerify = document.querySelectorAll('.btn-success[onclick="verificarTodo()"]');
-  const btnReiniciar = document.querySelector('.btn-light[onclick="reiniciarTodo()"]');
   if (completado) {
     radios.forEach(r => r.disabled = true);
     btnVerify.forEach(b => b.disabled = true);
-    if (btnReiniciar) btnReiniciar.disabled = true;
   } else {
     radios.forEach(r => r.disabled = false);
     btnVerify.forEach(b => b.disabled = false);
-    if (btnReiniciar) btnReiniciar.disabled = false;
   }
+  // El botón reiniciar siempre está habilitado
 
   actualizarBotonesNavegacion();
 }
@@ -1159,6 +1162,13 @@ function verificarTodo() {
     let seleccion = respuestasUsuario[idx];
     let feedback = document.getElementById(`feedback-${idx}`);
     let item = document.getElementById(`pregunta-${idx}`);
+
+    // Verificar que los elementos existan para evitar errores
+    if (!feedback || !item) {
+      console.error(`No se encontró el elemento de retroalimentación para la pregunta ${idx}`);
+      return;
+    }
+
     if (seleccion === null) {
       feedback.className = 'feedback incorrecto';
       feedback.innerHTML = `<i class="bi bi-x-circle"></i> Sin responder`;
@@ -1204,21 +1214,15 @@ function actualizarProgreso(correctas) {
 }
 
 function reiniciarTodo() {
-  // No reiniciar si el ejercicio está completado
   let idx = parseInt(document.getElementById('exerciseSelect').value);
-  if (ejerciciosCompletados.includes(idx)) {
-    alert('Este ejercicio ya fue completado. No se puede reiniciar.');
-    return;
+  // Quitar el ejercicio de completados si lo está
+  const indexInCompletados = ejerciciosCompletados.indexOf(idx);
+  if (indexInCompletados !== -1) {
+    ejerciciosCompletados.splice(indexInCompletados, 1);
+    guardarCompletados();
   }
-  respuestasUsuario.fill(null);
-  document.querySelectorAll('input[type="radio"]').forEach(r => (r.checked = false));
-  document.querySelectorAll('[id^="feedback-"]').forEach(el => {
-    el.className = 'feedback';
-    el.innerHTML = '';
-  });
-  document.querySelectorAll('.pregunta-item').forEach(item => (item.style.borderLeftColor = 'var(--primary)'));
-  document.getElementById('globalResult')?.classList.add('d-none');
-  actualizarProgreso(0);
+  // Recargar el ejercicio para reiniciar todo
+  cargarEjercicio();
 }
 
 function actualizarBotonesNavegacion() {
