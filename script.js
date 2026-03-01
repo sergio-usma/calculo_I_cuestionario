@@ -36,7 +36,7 @@ async function cargarEjercicios() {
 }
 
 // ------------------------------------------------------------
-// FUNCIONES DE CÁLCULO (INCLUYE sqrt_frac, circunferencia, elipse)
+// FUNCIONES DE CÁLCULO (CORREGIDAS)
 // ------------------------------------------------------------
 function obtenerCorteX(ex) {
   try {
@@ -74,11 +74,31 @@ function obtenerCorteX(ex) {
       return "No hay";
     }
     if (ex.tipo === 'sqrt') {
-      if (ex.reflexion) return `(${ex.a},0)`;
-      else return `(${ex.a},0)`;
+      let desp = ex.desplazamientoV || 0;
+      if (desp > 0) return "No hay";
+      let target = -desp;
+      let inner = target * target;
+      let x;
+      if (ex.reflexion) {
+        x = ex.a - inner;
+      } else {
+        x = ex.a + inner;
+      }
+      return `(${x.toFixed(1)},0)`;
     }
     if (ex.tipo === 'sqrt_frac') {
-      return "No hay";
+      let desp = ex.desplazamientoV || 0;
+      if (desp === 0) return "No hay";
+      let right = -ex.num / desp;
+      if (right <= 0) return "No hay";
+      let inner = right * right;
+      let x;
+      if (ex.reflexion) {
+        x = ex.a - inner;
+      } else {
+        x = ex.a + inner;
+      }
+      return `(${x.toFixed(1)},0)`;
     }
     if (ex.tipo === 'lineal') {
       if (ex.m === 0) return ex.b === 0 ? "Todo ℝ" : "No hay";
@@ -89,23 +109,23 @@ function obtenerCorteX(ex) {
       if (ex.h !== undefined) {
         let k = ex.k;
         if (k === 0) return `(${ex.h},0)`;
-        if (-k/ex.a < 0) return "No hay";
-        let sqrtVal = Math.sqrt(-k/ex.a);
+        if (-k / ex.a < 0) return "No hay";
+        let sqrtVal = Math.sqrt(-k / ex.a);
         let x1 = ex.h - sqrtVal, x2 = ex.h + sqrtVal;
         return x1 === x2 ? `(${x1.toFixed(1)},0)` : `(${x1.toFixed(1)},0) y (${x2.toFixed(1)},0)`;
       } else {
-        let disc = ex.b*ex.b - 4*ex.a*ex.c;
+        let disc = ex.b * ex.b - 4 * ex.a * ex.c;
         if (disc < 0) return "No hay";
-        if (disc === 0) return `(${(-ex.b/(2*ex.a)).toFixed(1)},0)`;
-        let x1 = (-ex.b - Math.sqrt(disc))/(2*ex.a);
-        let x2 = (-ex.b + Math.sqrt(disc))/(2*ex.a);
+        if (disc === 0) return `(${(-ex.b / (2 * ex.a)).toFixed(1)},0)`;
+        let x1 = (-ex.b - Math.sqrt(disc)) / (2 * ex.a);
+        let x2 = (-ex.b + Math.sqrt(disc)) / (2 * ex.a);
         return `(${x1.toFixed(1)},0) y (${x2.toFixed(1)},0)`;
       }
     }
     if (ex.tipo === 'circunferencia') {
       let [h, k] = ex.centro;
       let r = ex.radio;
-      let valor = r*r - k*k;
+      let valor = r * r - k * k;
       if (valor < 0) return "No hay";
       if (valor === 0) return `(${h.toFixed(1)},0)`;
       let sqrtVal = Math.sqrt(valor);
@@ -115,15 +135,36 @@ function obtenerCorteX(ex) {
     if (ex.tipo === 'elipse') {
       let [h, k] = ex.centro;
       let a = ex.a, b = ex.b;
-      let valor = 1 - (k*k)/(b*b);
+      let valor = 1 - (k * k) / (b * b);
       if (valor < 0) return "No hay";
       if (valor === 0) return `(${h.toFixed(1)},0)`;
-      let sqrtVal = Math.sqrt(valor * a*a);
+      let sqrtVal = Math.sqrt(valor * a * a);
       let x1 = h - sqrtVal, x2 = h + sqrtVal;
       return `(${x1.toFixed(1)},0) y (${x2.toFixed(1)},0)`;
     }
+    if (ex.tipo === 'racional') {
+      let desp = ex.desplazamientoV || 0;
+      if (desp === 0) return "No hay";
+      let argX = -ex.num / desp;
+      let x;
+      if (ex.reflexion) {
+        x = ex.a - argX;
+      } else {
+        x = ex.a + argX;
+      }
+      return `(${x.toFixed(1)},0)`;
+    }
+    if (ex.tipo === 'exponential') {
+      let desp = ex.desplazamientoV || 0;
+      if (desp >= 0) return "No hay";
+      let target = -desp;
+      let x = Math.log(target) / Math.log(ex.base);
+      return `(${x.toFixed(1)},0)`;
+    }
     return "No disponible";
-  } catch { return "Error"; }
+  } catch {
+    return "Error";
+  }
 }
 
 function obtenerCorteY(ex) {
@@ -178,14 +219,14 @@ function obtenerCorteY(ex) {
     if (ex.tipo === 'lineal') return `(0, ${ex.b})`;
     if (ex.tipo === 'quad') {
       if (ex.h !== undefined) {
-        let y = ex.a * (0 - ex.h)**2 + ex.k;
+        let y = ex.a * (0 - ex.h) ** 2 + ex.k;
         return `(0, ${y.toFixed(1)})`;
       } else return `(0, ${ex.c})`;
     }
     if (ex.tipo === 'circunferencia') {
       let [h, k] = ex.centro;
       let r = ex.radio;
-      let valor = r*r - h*h;
+      let valor = r * r - h * h;
       if (valor < 0) return "No hay";
       if (valor === 0) return `(0, ${k.toFixed(1)})`;
       let sqrtVal = Math.sqrt(valor);
@@ -195,15 +236,27 @@ function obtenerCorteY(ex) {
     if (ex.tipo === 'elipse') {
       let [h, k] = ex.centro;
       let a = ex.a, b = ex.b;
-      let valor = 1 - (h*h)/(a*a);
+      let valor = 1 - (h * h) / (a * a);
       if (valor < 0) return "No hay";
       if (valor === 0) return `(0, ${k.toFixed(1)})`;
-      let sqrtVal = Math.sqrt(valor * b*b);
+      let sqrtVal = Math.sqrt(valor * b * b);
       let y1 = k - sqrtVal, y2 = k + sqrtVal;
       return `(0, ${y1.toFixed(1)}) y (0, ${y2.toFixed(1)})`;
     }
+    if (ex.tipo === 'racional') {
+      let arg = ex.reflexion ? ex.a - 0 : 0 - ex.a;
+      if (arg === 0) return "No hay";
+      let y = ex.num / arg + (ex.desplazamientoV || 0);
+      return `(0, ${y.toFixed(1)})`;
+    }
+    if (ex.tipo === 'exponential') {
+      let y = 1 + (ex.desplazamientoV || 0);
+      return `(0, ${y.toFixed(1)})`;
+    }
     return "No disponible";
-  } catch { return "Error"; }
+  } catch {
+    return "Error";
+  }
 }
 
 function obtenerDominio(ex) {
@@ -258,6 +311,12 @@ function obtenerDominio(ex) {
     let a = ex.a;
     return `[${(h - a).toFixed(1)}, ${(h + a).toFixed(1)}]`;
   }
+  if (ex.tipo === 'racional') {
+    return `(-∞, ${ex.a}) ∪ (${ex.a}, ∞)`;
+  }
+  if (ex.tipo === 'exponential') {
+    return "ℝ";
+  }
   return "ℝ";
 }
 
@@ -283,7 +342,7 @@ function obtenerRango(ex) {
     if (ex.h !== undefined) {
       return ex.a > 0 ? `[${ex.k.toFixed(1)}, ∞)` : `(-∞, ${ex.k.toFixed(1)}]`;
     } else {
-      let verticeY = ex.c - (ex.b*ex.b)/(4*ex.a);
+      let verticeY = ex.c - (ex.b * ex.b) / (4 * ex.a);
       return ex.a > 0 ? `[${verticeY.toFixed(1)}, ∞)` : `(-∞, ${verticeY.toFixed(1)}]`;
     }
   }
@@ -302,13 +361,21 @@ function obtenerRango(ex) {
     let b = ex.b;
     return `[${(k - b).toFixed(1)}, ${(k + b).toFixed(1)}]`;
   }
+  if (ex.tipo === 'racional') {
+    let desp = ex.desplazamientoV || 0;
+    return `(-∞, ${desp}) ∪ (${desp}, ∞)`;
+  }
+  if (ex.tipo === 'exponential') {
+    let desp = ex.desplazamientoV || 0;
+    return `(${desp.toFixed(1)}, ∞)`;
+  }
   return "ℝ";
 }
 
 function esFuncion(ex) {
   if (ex.tipo === 'relacion' && ex.forma.includes('y2')) return 1;
   if (ex.tipo === 'producto') return 1;
-  if (ex.tipo === 'circunferencia' || ex.tipo === 'elipse') return 1; // no es función
+  if (ex.tipo === 'circunferencia' || ex.tipo === 'elipse') return 1;
   return 0;
 }
 
@@ -341,6 +408,27 @@ function obtenerRadioSemiejes(ex) {
   }
   if (ex.tipo === 'elipse') {
     return `a = ${ex.a}, b = ${ex.b}`;
+  }
+  return null;
+}
+
+function obtenerAsintotaVertical(ex) {
+  if (ex.tipo === 'racional' || ex.tipo === 'sqrt_frac') {
+    return `x = ${ex.a}`;
+  }
+  return null;
+}
+
+function obtenerDiscriminante(ex) {
+  if (ex.tipo === 'quad') {
+    if (ex.h !== undefined) {
+      let a = ex.a;
+      let b = -2 * a * ex.h;
+      let c = a * ex.h * ex.h + ex.k;
+      return b * b - 4 * a * c;
+    } else {
+      return ex.b * ex.b - 4 * ex.a * ex.c;
+    }
   }
   return null;
 }
@@ -405,19 +493,30 @@ function puntoPertenece(ex, x, y) {
             } else {
               valor = parseFloat(derecha);
             }
-            return Math.abs(y*y - valor) < 0.001;
+            return Math.abs(y * y - valor) < 0.001;
           }
         }
         return false;
       case 'circunferencia':
         let [h, k] = ex.centro;
-        return Math.abs((x - h)**2 + (y - k)**2 - ex.radio**2) < 0.001;
+        return Math.abs((x - h) ** 2 + (y - k) ** 2 - ex.radio ** 2) < 0.001;
       case 'elipse':
         let [h2, k2] = ex.centro;
-        return Math.abs(((x - h2)**2)/(ex.a**2) + ((y - k2)**2)/(ex.b**2) - 1) < 0.001;
-      default: return false;
+        return Math.abs(((x - h2) ** 2) / (ex.a ** 2) + ((y - k2) ** 2) / (ex.b ** 2) - 1) < 0.001;
+      case 'racional':
+        let argR = ex.reflexion ? ex.a - x : x - ex.a;
+        if (Math.abs(argR) < 1e-10) return false;
+        let yCalcR = ex.num / argR + (ex.desplazamientoV || 0);
+        return Math.abs(yCalcR - y) < 0.001;
+      case 'exponential':
+        let yCalcE = Math.pow(ex.base, x) + (ex.desplazamientoV || 0);
+        return Math.abs(yCalcE - y) < 0.001;
+      default:
+        return false;
     }
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 function esCreciente(ex) {
@@ -426,6 +525,7 @@ function esCreciente(ex) {
   if (ex.tipo === 'sqrt_frac') {
     return ex.reflexion;
   }
+  if (ex.tipo === 'exponential') return ex.base > 1;
   return null;
 }
 
@@ -439,49 +539,47 @@ function tieneMinimo(ex) {
   return false;
 }
 
-function obtenerDiscriminante(ex) {
-  if (ex.tipo === 'quad') {
-    if (ex.h !== undefined) {
-      // Forma canónica: a(x-h)^2 + k, el discriminante no es directo, pero podemos usar la fórmula general expandida
-      // Para simplificar, convertimos a forma general: a x^2 -2a h x + (a h^2 + k)
-      let a = ex.a;
-      let b = -2 * a * ex.h;
-      let c = a * ex.h * ex.h + ex.k;
-      return b*b - 4*a*c;
-    } else {
-      return ex.b*ex.b - 4*ex.a*ex.c;
-    }
-  }
-  return null;
-}
-
 // ------------------------------------------------------------
-// FUNCIÓN PARA NORMALIZAR OPCIONES (evita duplicados)
+// FUNCIÓN PARA NORMALIZAR OPCIONES (MEJORADA)
 // ------------------------------------------------------------
 function normalizarOpcion(opt) {
   if (typeof opt !== 'string') return String(opt);
-  // Normalizar puntos como (x,y) → un decimal
+  // Normalizar puntos (x,y)
   let puntoMatch = opt.match(/^\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)?$/);
   if (puntoMatch) {
-    let x = parseFloat(puntoMatch[1]).toFixed(1);
-    let y = parseFloat(puntoMatch[2]).toFixed(1);
-    x = x.endsWith('.0') ? x.slice(0, -2) : x;
-    y = y.endsWith('.0') ? y.slice(0, -2) : y;
-    return `(${x}, ${y})`;
+    let x = parseFloat(puntoMatch[1]);
+    let y = parseFloat(puntoMatch[2]);
+    x = Math.round(x * 10) / 10;
+    y = Math.round(y * 10) / 10;
+    let xStr = x % 1 === 0 ? x.toString() : x.toFixed(1);
+    let yStr = y % 1 === 0 ? y.toString() : y.toFixed(1);
+    return `(${xStr}, ${yStr})`;
   }
-  // Normalizar intervalos como [a,b] o (a,b)
-  let intervaloMatch = opt.match(/^([\[\(])\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*([\]\)])$/);
-  if (intervaloMatch) {
-    let ini = parseFloat(intervaloMatch[2]).toFixed(1);
-    let fin = parseFloat(intervaloMatch[3]).toFixed(1);
-    ini = ini.endsWith('.0') ? ini.slice(0, -2) : ini;
-    fin = fin.endsWith('.0') ? fin.slice(0, -2) : fin;
-    return `${intervaloMatch[1]}${ini}, ${fin}${intervaloMatch[4]}`;
+  // Normalizar intervalos con posibles infinitos
+  let intervaloInfMatch = opt.match(/^([\[\(])\s*(-?(?:\d+\.?\d*|∞))\s*,\s*(-?(?:\d+\.?\d*|∞))\s*([\]\)])$/);
+  if (intervaloInfMatch) {
+    let left = intervaloInfMatch[1];
+    let inf1 = intervaloInfMatch[2];
+    let inf2 = intervaloInfMatch[3];
+    let right = intervaloInfMatch[4];
+    // Procesar si son números para redondear
+    if (!isNaN(parseFloat(inf1))) {
+      let num = parseFloat(inf1);
+      num = Math.round(num * 10) / 10;
+      inf1 = num % 1 === 0 ? num.toString() : num.toFixed(1);
+    }
+    if (!isNaN(parseFloat(inf2))) {
+      let num = parseFloat(inf2);
+      num = Math.round(num * 10) / 10;
+      inf2 = num % 1 === 0 ? num.toString() : num.toFixed(1);
+    }
+    return `${left}${inf1},${inf2}${right}`;
   }
   // Normalizar números sueltos
   if (!isNaN(parseFloat(opt)) && isFinite(opt)) {
-    let num = parseFloat(opt).toFixed(1);
-    return num.endsWith('.0') ? num.slice(0, -2) : num;
+    let num = parseFloat(opt);
+    num = Math.round(num * 10) / 10;
+    return num % 1 === 0 ? num.toString() : num.toFixed(1);
   }
   return opt;
 }
@@ -526,19 +624,17 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: `Sí, porque se forma con un elemento de A y otro de B.`
     });
 
-    // Pregunta sobre B×A: un par que sí pertenece
     let b0 = B[0];
     let a0 = A[0];
     preguntas.push({
       texto: `¿El par (${b0}, ${a0}) pertenece a B × A?`,
       opciones: ["Sí", "No"],
-      correcta: 0, // siempre pertenece porque b0∈B y a0∈A
+      correcta: 0,
       explicacion: `Sí, porque ${b0} ∈ B y ${a0} ∈ A.`
     });
 
-    // Pregunta sobre B×A: un par que NO pertenece
     let maxA = Math.max(...A);
-    let noA = maxA + 1; // número que no está en A
+    let noA = maxA + 1;
     let parNoBA = `(${b0}, ${noA})`;
     preguntas.push({
       texto: `¿El par ${parNoBA} pertenece a B × A?`,
@@ -547,7 +643,6 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: `No, porque ${noA} no pertenece a A (A = {${A.join(', ')}}).`
     });
 
-    // Pregunta sobre subconjuntos: A ⊆ B ?
     let aSubB = A.every(val => B.includes(val));
     preguntas.push({
       texto: "¿A ⊆ B?",
@@ -572,6 +667,14 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: esFunc ? "Cada elemento de A se relaciona con un único elemento de B." : "Cada elemento de A se relaciona con varios elementos de B, por lo que no es función."
     });
 
+    // Pregunta extra para que el total sea par
+    preguntas.push({
+      texto: "Cardinalidad del conjunto A",
+      opciones: [String(A.length), String(B.length), String(A.length + B.length), String(A.length * B.length)],
+      correcta: 0,
+      explicacion: `A tiene ${A.length} elementos.`
+    });
+
   } else {
     let cx = obtenerCorteX(ex);
     let cy = obtenerCorteY(ex);
@@ -581,6 +684,7 @@ function generarPreguntasParaEjercicio(ex) {
     let vertice = obtenerVertice(ex);
     let centro = obtenerCentro(ex);
     let radioSemiejes = obtenerRadioSemiejes(ex);
+    let asintota = obtenerAsintotaVertical(ex);
     let discriminante = obtenerDiscriminante(ex);
 
     // Pregunta 1: Corte con X
@@ -643,7 +747,19 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 7: Discriminante (solo para cuadráticas)
+    // Pregunta 7: Asíntota vertical (para racionales y sqrt_frac)
+    if (asintota) {
+      let opcionesAsint = [asintota, "x = 0", "y = 0", "No tiene"];
+      let { opciones: opAsint, correcta: corrAsint } = crearOpciones(opcionesAsint, asintota);
+      preguntas.push({
+        texto: "Ecuación de la asíntota vertical",
+        opciones: opAsint,
+        correcta: corrAsint,
+        explicacion: `La asíntota vertical está en ${asintota}.`
+      });
+    }
+
+    // Pregunta 8: Discriminante (solo para cuadráticas)
     if (discriminante !== null) {
       let discVal = discriminante.toFixed(1);
       let opcionesDisc = [discVal, "0", "1", "-1"];
@@ -657,7 +773,7 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 8: Centro (para circunferencia/elipse)
+    // Pregunta 9: Centro (para circunferencia/elipse)
     if (centro) {
       let opcionesCentro = [centro, "(0,0)", "No tiene centro", "(1,1)"];
       let { opciones: opCentro, correcta: corrCentro } = crearOpciones(opcionesCentro, centro);
@@ -669,7 +785,7 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 9: Radio/Semiejes (para circunferencia/elipse)
+    // Pregunta 10: Radio/Semiejes (para circunferencia/elipse)
     if (radioSemiejes) {
       let opcionesRadio = [radioSemiejes, "Radio = 1", "a=1, b=1", "No aplica"];
       let { opciones: opRadio, correcta: corrRadio } = crearOpciones(opcionesRadio, radioSemiejes);
@@ -681,7 +797,7 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 10: Representación por comprensión (si aplica)
+    // Pregunta 11: Representación por comprensión (si aplica)
     let repr = obtenerRepresentacionComprension(ex);
     if (repr && ex.tipo !== 'circunferencia' && ex.tipo !== 'elipse') {
       let domErr = dom === "ℝ" ? "[0,∞)" : "ℝ";
@@ -703,19 +819,25 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 11: Punto notable
+    // Pregunta 12: Punto notable
     let puntoNotable = null;
     if (ex.tipo === 'lineal') puntoNotable = { x: 0, y: ex.b };
     else if (ex.tipo === 'quad' && vertice) {
-      let coords = vertice.replace(/[()]/g,'').split(',').map(Number);
+      let coords = vertice.replace(/[()]/g, '').split(',').map(Number);
       puntoNotable = { x: coords[0], y: coords[1] };
     } else if (ex.tipo === 'sqrt') puntoNotable = { x: ex.a, y: ex.desplazamientoV || 0 };
     else if (ex.tipo === 'sqrt_frac') {
       let xVal = ex.reflexion ? ex.a - 1 : ex.a + 1;
       let yVal = ex.num / Math.sqrt(1) + (ex.desplazamientoV || 0);
       puntoNotable = { x: xVal, y: yVal };
+    } else if (ex.tipo === 'racional') {
+      let xVal = ex.reflexion ? ex.a - 1 : ex.a + 1;
+      let yVal = ex.num / 1 + (ex.desplazamientoV || 0);
+      puntoNotable = { x: xVal, y: yVal };
     } else if (ex.tipo === 'circunferencia' || ex.tipo === 'elipse') {
-      puntoNotable = { x: ex.centro[0] + (ex.tipo === 'circunferencia' ? ex.radio : ex.a), y: ex.centro[1] }; // punto derecho
+      puntoNotable = { x: ex.centro[0] + (ex.tipo === 'circunferencia' ? ex.radio : ex.a), y: ex.centro[1] };
+    } else if (ex.tipo === 'exponential') {
+      puntoNotable = { x: 0, y: 1 + (ex.desplazamientoV || 0) };
     }
     if (puntoNotable) {
       preguntas.push({
@@ -726,7 +848,7 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 12: Punto falso
+    // Pregunta 13: Punto falso
     let xFalso = 5, yFalso = 5;
     preguntas.push({
       texto: `¿El punto \\((${xFalso}, ${yFalso})\\) pertenece a la función?`,
@@ -735,7 +857,7 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: "No, porque no satisface la ecuación."
     });
 
-    // Pregunta 13: Máximo/mínimo (solo cuadráticas)
+    // Pregunta 14: Máximo/mínimo (solo cuadráticas)
     if (tieneMaximo(ex)) {
       preguntas.push({
         texto: "La función tiene un máximo",
@@ -752,7 +874,7 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 14: Monotonía (para lineales y sqrt)
+    // Pregunta 15: Monotonía (para lineales, sqrt, exponencial)
     let crec = esCreciente(ex);
     if (crec !== null) {
       preguntas.push({
@@ -763,7 +885,7 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 15: Comparación con relación (solo para sqrt)
+    // Pregunta 16: Comparación con relación (solo para sqrt)
     if (ex.tipo === 'sqrt') {
       let expr = obtenerExpresionDerecha(ex).replace(/\\sqrt/g, '');
       preguntas.push({
@@ -774,9 +896,9 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 16: Pertenencia al dominio
+    // Pregunta 17: Pertenencia al dominio
     let xTest = -2;
-    let perteneceDom = dom.includes('ℝ') || (dom.includes('[') && xTest >= parseFloat(dom.split(',')[0].replace('[',''))) || (dom.includes(']') && xTest <= parseFloat(dom.split(',')[1].replace(']',''))) || (dom.includes('(') && xTest > parseFloat(dom.split(',')[0].replace('(',''))) || (dom.includes(')') && xTest < parseFloat(dom.split(',')[1].replace(')','')));
+    let perteneceDom = dom.includes('ℝ') || (dom.includes('[') && xTest >= parseFloat(dom.split(',')[0].replace('[', ''))) || (dom.includes(']') && xTest <= parseFloat(dom.split(',')[1].replace(']', ''))) || (dom.includes('(') && xTest > parseFloat(dom.split(',')[0].replace('(', ''))) || (dom.includes(')') && xTest < parseFloat(dom.split(',')[1].replace(')', '')));
     preguntas.push({
       texto: `¿El valor \\(x = ${xTest}\\) pertenece al dominio?`,
       opciones: ["Sí", "No"],
@@ -784,15 +906,35 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: `El dominio es ${dom}, por lo tanto ${perteneceDom ? 'sí' : 'no'} pertenece.`
     });
 
-    // Pregunta 17: Pertenencia al rango
+    // Pregunta 18: Pertenencia al rango
     let yTest = 0;
-    let perteneceRan = ran.includes('ℝ') || (ran.includes('[') && yTest >= parseFloat(ran.split(',')[0].replace('[',''))) || (ran.includes(']') && yTest <= parseFloat(ran.split(',')[1].replace(']',''))) || (ran.includes('(') && yTest > parseFloat(ran.split(',')[0].replace('(',''))) || (ran.includes(')') && yTest < parseFloat(ran.split(',')[1].replace(')','')));
+    let perteneceRan = ran.includes('ℝ') || (ran.includes('[') && yTest >= parseFloat(ran.split(',')[0].replace('[', ''))) || (ran.includes(']') && yTest <= parseFloat(ran.split(',')[1].replace(']', ''))) || (ran.includes('(') && yTest > parseFloat(ran.split(',')[0].replace('(', ''))) || (ran.includes(')') && yTest < parseFloat(ran.split(',')[1].replace(')', '')));
     preguntas.push({
       texto: `¿El valor \\(y = ${yTest}\\) pertenece al rango?`,
       opciones: ["Sí", "No"],
       correcta: perteneceRan ? 0 : 1,
       explicacion: `El rango es ${ran}, por lo tanto ${perteneceRan ? 'sí' : 'no'} pertenece.`
     });
+
+    // Preguntas extra para tipos que resulten impares después de lo anterior
+    if (ex.tipo === 'circunferencia' || ex.tipo === 'elipse') {
+      let simX = (ex.centro[1] === 0);
+      preguntas.push({
+        texto: "¿La curva es simétrica respecto al eje X?",
+        opciones: ["Sí", "No"],
+        correcta: simX ? 0 : 1,
+        explicacion: simX ? "Sí, porque el centro está sobre el eje X." : "No, porque el centro no está sobre el eje X."
+      });
+    }
+
+    if (ex.tipo === 'exponential') {
+      preguntas.push({
+        texto: "¿La función tiene un máximo o mínimo?",
+        opciones: ["Sí", "No"],
+        correcta: 1,
+        explicacion: "Las funciones exponenciales son monótonas y no tienen máximos ni mínimos locales."
+      });
+    }
   }
 
   return preguntas;
@@ -808,7 +950,7 @@ function cargarSelector() {
   ejercicios.forEach((_, i) => {
     let opt = document.createElement('option');
     opt.value = i;
-    opt.textContent = `Ejercicio #${String(i+1).padStart(2, '0')}`;
+    opt.textContent = `Ejercicio #${String(i + 1).padStart(2, '0')}`;
     select.appendChild(opt);
   });
 }
@@ -887,7 +1029,7 @@ function renderizarPreguntas() {
   });
 }
 
-window.guardarRespuesta = function(idx, valor) {
+window.guardarRespuesta = function (idx, valor) {
   respuestasUsuario[idx] = valor;
 };
 
@@ -918,7 +1060,7 @@ function verificarTodo() {
   }
 
   let total = preguntasActuales.length;
-  let porcentaje = Math.round(correctas / total * 100);
+  let porcentaje = Math.round((correctas / total) * 100);
   let globalDiv = document.getElementById('globalResult');
   if (!globalDiv) return;
   globalDiv.className = `alert d-block mt-5 text-center shadow-lg border-0 py-4 ${correctas === total ? 'alert-success' : 'alert-info'}`;
@@ -934,18 +1076,18 @@ function actualizarProgreso(correctas) {
 
 function reiniciarTodo() {
   respuestasUsuario.fill(null);
-  document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[type="radio"]').forEach(r => (r.checked = false));
   document.querySelectorAll('[id^="feedback-"]').forEach(el => {
     el.className = 'feedback';
     el.innerHTML = '';
   });
-  document.querySelectorAll('.pregunta-item').forEach(item => item.style.borderLeftColor = 'var(--primary)');
+  document.querySelectorAll('.pregunta-item').forEach(item => (item.style.borderLeftColor = 'var(--primary)'));
   document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
 }
 
 // ------------------------------------------------------------
-// FUNCIONES AUXILIARES PARA GRÁFICAS (con sqrt_frac, circunferencia, elipse)
+// FUNCIONES AUXILIARES PARA GRÁFICAS
 // ------------------------------------------------------------
 function calcularPuntosNotables(ex) {
   let puntos = [];
@@ -1012,6 +1154,21 @@ function calcularPuntosNotables(ex) {
       }
       return puntos;
     }
+    if (ex.tipo === 'racional') {
+      let x0 = ex.a;
+      puntos.push({ x: x0, y: null, label: `Asíntota x = ${x0}` });
+      let argY = ex.reflexion ? ex.a - 0 : 0 - ex.a;
+      if (argY !== 0) {
+        let y = ex.num / argY + (ex.desplazamientoV || 0);
+        puntos.push({ x: 0, y: y, label: `(0,${y.toFixed(2)})` });
+      }
+      let x1 = ex.reflexion ? ex.a - 1 : ex.a + 1;
+      if ((ex.reflexion && x1 < ex.a) || (!ex.reflexion && x1 > ex.a)) {
+        let y1 = ex.num / 1 + (ex.desplazamientoV || 0);
+        puntos.push({ x: x1, y: y1, label: `(${x1.toFixed(2)},${y1.toFixed(2)})` });
+      }
+      return puntos;
+    }
     if (ex.tipo === 'lineal') {
       if (ex.m !== 0) {
         let x = -ex.b / ex.m;
@@ -1058,20 +1215,34 @@ function calcularPuntosNotables(ex) {
       let [h, k] = ex.centro;
       let r = ex.radio;
       puntos.push({ x: h, y: k, label: `Centro (${h},${k})` });
-      puntos.push({ x: h + r, y: k, label: `(${h+r},${k})` });
-      puntos.push({ x: h - r, y: k, label: `(${h-r},${k})` });
-      puntos.push({ x: h, y: k + r, label: `(${h},${k+r})` });
-      puntos.push({ x: h, y: k - r, label: `(${h},${k-r})` });
+      puntos.push({ x: h + r, y: k, label: `(${h + r},${k})` });
+      puntos.push({ x: h - r, y: k, label: `(${h - r},${k})` });
+      puntos.push({ x: h, y: k + r, label: `(${h},${k + r})` });
+      puntos.push({ x: h, y: k - r, label: `(${h},${k - r})` });
       return puntos;
     }
     if (ex.tipo === 'elipse') {
       let [h, k] = ex.centro;
       let a = ex.a, b = ex.b;
       puntos.push({ x: h, y: k, label: `Centro (${h},${k})` });
-      puntos.push({ x: h + a, y: k, label: `(${h+a},${k})` });
-      puntos.push({ x: h - a, y: k, label: `(${h-a},${k})` });
-      puntos.push({ x: h, y: k + b, label: `(${h},${k+b})` });
-      puntos.push({ x: h, y: k - b, label: `(${h},${k-b})` });
+      puntos.push({ x: h + a, y: k, label: `(${h + a},${k})` });
+      puntos.push({ x: h - a, y: k, label: `(${h - a},${k})` });
+      puntos.push({ x: h, y: k + b, label: `(${h},${k + b})` });
+      puntos.push({ x: h, y: k - b, label: `(${h},${k - b})` });
+      return puntos;
+    }
+    if (ex.tipo === 'exponential') {
+      let desp = ex.desplazamientoV || 0;
+      puntos.push({ x: 0, y: 1 + desp, label: `(0,${(1+desp).toFixed(2)})` });
+      puntos.push({ x: 1, y: ex.base + desp, label: `(1,${(ex.base+desp).toFixed(2)})` });
+      let cx = obtenerCorteX(ex);
+      if (cx !== "No hay" && cx !== "No aplica") {
+        let match = cx.match(/\((-?\d+\.?\d*),0\)/);
+        if (match) {
+          let x0 = parseFloat(match[1]);
+          puntos.push({ x: x0, y: 0, label: `(${x0.toFixed(2)},0)` });
+        }
+      }
       return puntos;
     }
   } catch (e) {
@@ -1088,6 +1259,7 @@ function calcularLimitesX(ex, puntosNotables) {
   xs.push(0);
   if (ex.tipo === 'sqrt') xs.push(ex.a);
   if (ex.tipo === 'sqrt_frac') xs.push(ex.a);
+  if (ex.tipo === 'racional') xs.push(ex.a);
   if (ex.tipo === 'relacion' && ex.forma.includes('y2')) {
     let latex = ex.latex;
     let match = latex.match(/y\^2\s*=\s*(.+)/);
@@ -1119,6 +1291,15 @@ function calcularLimitesX(ex, puntosNotables) {
     let a = ex.tipo === 'circunferencia' ? ex.radio : ex.a;
     xs.push(h - a);
     xs.push(h + a);
+  }
+  if (ex.tipo === 'exponential') {
+    let cx = obtenerCorteX(ex);
+    if (cx !== "No hay" && cx !== "No aplica") {
+      let match = cx.match(/\((-?\d+\.?\d*),0\)/);
+      if (match) {
+        xs.push(parseFloat(match[1]));
+      }
+    }
   }
   xs = xs.filter(x => isFinite(x) && !isNaN(x));
   if (xs.length === 0) return { min: -10, max: 10 };
@@ -1189,9 +1370,7 @@ function generarGrafica() {
           y = ex.m * x + ex.b;
           break;
         case 'quad':
-          y = (ex.h !== undefined)
-            ? ex.a * Math.pow(x - ex.h, 2) + ex.k
-            : ex.a * x * x + ex.b * x + ex.c;
+          y = (ex.h !== undefined) ? ex.a * Math.pow(x - ex.h, 2) + ex.k : ex.a * x * x + ex.b * x + ex.c;
           break;
         case 'sqrt':
           let argumento = ex.reflexion ? ex.a - x : x - ex.a;
@@ -1200,6 +1379,12 @@ function generarGrafica() {
         case 'sqrt_frac':
           let argF = ex.reflexion ? ex.a - x : x - ex.a;
           if (argF > 0) y = ex.num / Math.sqrt(argF) + (ex.desplazamientoV || 0);
+          break;
+        case 'racional':
+          let argR = ex.reflexion ? ex.a - x : x - ex.a;
+          if (Math.abs(argR) > 1e-10) {
+            y = ex.num / argR + (ex.desplazamientoV || 0);
+          }
           break;
         case 'relacion':
           if (ex.forma.includes('y2')) {
@@ -1238,7 +1423,7 @@ function generarGrafica() {
         case 'circunferencia':
           let [h, k] = ex.centro;
           let r = ex.radio;
-          let radicando = r*r - (x - h)*(x - h);
+          let radicando = r * r - (x - h) * (x - h);
           if (radicando >= 0) {
             y = k + Math.sqrt(radicando);
             yNeg = k - Math.sqrt(radicando);
@@ -1247,14 +1432,19 @@ function generarGrafica() {
         case 'elipse':
           let [h2, k2] = ex.centro;
           let a = ex.a, b = ex.b;
-          let radicando2 = 1 - ((x - h2)*(x - h2))/(a*a);
+          let radicando2 = 1 - ((x - h2) * (x - h2)) / (a * a);
           if (radicando2 >= 0) {
             y = k2 + b * Math.sqrt(radicando2);
             yNeg = k2 - b * Math.sqrt(radicando2);
           }
           break;
+        case 'exponential':
+          y = Math.pow(ex.base, x) + (ex.desplazamientoV || 0);
+          break;
       }
-    } catch (e) { y = null; }
+    } catch (e) {
+      y = null;
+    }
 
     if (y !== null && isFinite(y)) dataPrincipal.push({ x: redondear(x), y: redondear(y) });
     if (yNeg !== null && isFinite(yNeg)) dataNegativa.push({ x: redondear(x), y: redondear(yNeg) });
@@ -1264,16 +1454,18 @@ function generarGrafica() {
   dataPrincipal = dataPrincipal.filter(p => p.y >= limitesY.min && p.y <= limitesY.max);
   dataNegativa = dataNegativa.filter(p => p.y >= limitesY.min && p.y <= limitesY.max);
 
-  const datasets = [{
-    label: 'f(x)',
-    data: dataPrincipal,
-    borderColor: '#2b6cb0',
-    borderWidth: 2,
-    pointRadius: 0,
-    showLine: true,
-    fill: false,
-    tension: 0.1
-  }];
+  const datasets = [
+    {
+      label: 'f(x)',
+      data: dataPrincipal,
+      borderColor: '#2b6cb0',
+      borderWidth: 2,
+      pointRadius: 0,
+      showLine: true,
+      fill: false,
+      tension: 0.1
+    }
+  ];
 
   if (dataNegativa.length > 0) {
     datasets.push({
@@ -1314,8 +1506,8 @@ function generarGrafica() {
           min: limitesX.min,
           max: limitesX.max,
           grid: {
-            color: context => context.tick.value === 0 ? '#000' : '#e5e5e5',
-            lineWidth: context => context.tick.value === 0 ? 2 : 1
+            color: context => (context.tick.value === 0 ? '#000' : '#e5e5e5'),
+            lineWidth: context => (context.tick.value === 0 ? 2 : 1)
           },
           title: { display: true, text: 'Eje X' }
         },
@@ -1324,8 +1516,8 @@ function generarGrafica() {
           min: limitesY.min,
           max: limitesY.max,
           grid: {
-            color: context => context.tick.value === 0 ? '#000' : '#e5e5e5',
-            lineWidth: context => context.tick.value === 0 ? 2 : 1
+            color: context => (context.tick.value === 0 ? '#000' : '#e5e5e5'),
+            lineWidth: context => (context.tick.value === 0 ? 2 : 1)
           },
           title: { display: true, text: 'Eje Y' }
         }
@@ -1334,7 +1526,7 @@ function generarGrafica() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (item) => `(${item.parsed.x.toFixed(1)}, ${item.parsed.y.toFixed(1)})`
+            label: item => `(${item.parsed.x.toFixed(1)}, ${item.parsed.y.toFixed(1)})`
           }
         }
       }
@@ -1370,7 +1562,7 @@ function initDarkMode() {
 // ------------------------------------------------------------
 // INICIALIZACIÓN
 // ------------------------------------------------------------
-window.onload = function() {
+window.onload = function () {
   initDarkMode();
   cargarEjercicios();
   document.getElementById('exerciseSelect').addEventListener('change', cargarEjercicio);
