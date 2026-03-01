@@ -36,48 +36,35 @@ async function cargarEjercicios() {
 }
 
 // ------------------------------------------------------------
-// FUNCIONES DE CÁLCULO (MEJORADAS PARA RELACIONES)
+// FUNCIONES DE CÁLCULO (INCLUYE sqrt_frac)
 // ------------------------------------------------------------
 function obtenerCorteX(ex) {
   try {
     if (ex.tipo === 'producto') return "No aplica";
     if (ex.tipo === 'relacion') {
-      if (ex.forma === 'circulo') {
-        let r = Math.sqrt(ex.r2);
-        return `(${r.toFixed(1)},0) y (${-r.toFixed(1)},0)`;
-      }
       if (ex.forma.includes('y2')) {
-        // Analizar la expresión LaTeX para encontrar el corte con X (y=0)
         let latex = ex.latex;
         let match = latex.match(/y\^2\s*=\s*(.+)/);
         if (match) {
           let derecha = match[1].replace(/\s/g, '');
-          // Buscar un número que podría estar sumando o restando x
           if (derecha.includes('x')) {
-            // Forma: x + c  o  c - x
             if (derecha.includes('+')) {
               let partes = derecha.split('+');
               let c = partes.find(p => !p.includes('x'));
               if (c) return `(${parseFloat(c)},0)`;
             } else if (derecha.includes('-')) {
               let partes = derecha.split('-');
-              // Puede ser "c - x" o "x - c"
               if (partes[0].includes('x')) {
-                // x - c  => corte en x = c
                 let c = partes[1];
                 return `(${parseFloat(c)},0)`;
               } else {
-                // c - x  => corte en x = c
                 let c = partes[0];
                 return `(${parseFloat(c)},0)`;
               }
             } else {
-              // Solo "x" (sin constante) o "x + constante" sin signo explícito
               if (derecha === 'x') return "(0,0)";
-              // Si es algo como "x+1" ya se capturó en el caso '+'
             }
           } else {
-            // No hay x, entonces es y^2 = constante (como y^2=4) -> no corte con X (solo si constante=0)
             if (parseFloat(derecha) === 0) return "(0,0)";
             return "No hay";
           }
@@ -89,6 +76,10 @@ function obtenerCorteX(ex) {
     if (ex.tipo === 'sqrt') {
       if (ex.reflexion) return `(${ex.a},0)`;
       else return `(${ex.a},0)`;
+    }
+    if (ex.tipo === 'sqrt_frac') {
+      // y = num / sqrt(±(x - a)) + desp, nunca corta el eje X porque num>0 y raíz positiva da y>0 (a menos que num=0)
+      return "No hay";
     }
     if (ex.tipo === 'lineal') {
       if (ex.m === 0) return ex.b === 0 ? "Todo ℝ" : "No hay";
@@ -112,7 +103,6 @@ function obtenerCorteX(ex) {
         return `(${x1.toFixed(1)},0) y (${x2.toFixed(1)},0)`;
       }
     }
-    if (ex.tipo === 'exp') return "No hay";
     return "No disponible";
   } catch { return "Error"; }
 }
@@ -121,17 +111,11 @@ function obtenerCorteY(ex) {
   try {
     if (ex.tipo === 'producto') return "No aplica";
     if (ex.tipo === 'relacion') {
-      if (ex.forma === 'circulo') {
-        let r = Math.sqrt(ex.r2);
-        return `(0, ${r.toFixed(1)}) y (0, -${r.toFixed(1)})`;
-      }
       if (ex.forma.includes('y2')) {
-        // Analizar la expresión para x=0
         let latex = ex.latex;
         let match = latex.match(/y\^2\s*=\s*(.+)/);
         if (match) {
           let derecha = match[1].replace(/\s/g, '');
-          // Evaluar en x=0
           let valor;
           if (derecha.includes('x')) {
             if (derecha.includes('+')) {
@@ -141,20 +125,16 @@ function obtenerCorteY(ex) {
             } else if (derecha.includes('-')) {
               let partes = derecha.split('-');
               if (partes[0].includes('x')) {
-                // x - c => 0 - c = -c
                 let c = partes[1];
                 valor = -parseFloat(c);
               } else {
-                // c - x => c - 0 = c
                 let c = partes[0];
                 valor = parseFloat(c);
               }
             } else {
-              // Solo x, entonces valor = 0
               valor = 0;
             }
           } else {
-            // Constante pura
             valor = parseFloat(derecha);
           }
           if (valor < 0) return "No hay";
@@ -170,17 +150,19 @@ function obtenerCorteY(ex) {
       let y = Math.sqrt(val) + (ex.desplazamientoV || 0);
       return `(0, ${y.toFixed(1)})`;
     }
+    if (ex.tipo === 'sqrt_frac') {
+      // y = num / sqrt(±(0 - a)) + desp
+      let arg = ex.reflexion ? ex.a - 0 : 0 - ex.a;
+      if (arg <= 0) return "No hay"; // La raíz de un número no positivo no está en reales (a menos que sea cero, pero daría infinito)
+      let y = ex.num / Math.sqrt(arg) + (ex.desplazamientoV || 0);
+      return `(0, ${y.toFixed(1)})`;
+    }
     if (ex.tipo === 'lineal') return `(0, ${ex.b})`;
     if (ex.tipo === 'quad') {
       if (ex.h !== undefined) {
         let y = ex.a * (0 - ex.h)**2 + ex.k;
         return `(0, ${y.toFixed(1)})`;
       } else return `(0, ${ex.c})`;
-    }
-    if (ex.tipo === 'exp') {
-      let base = ex.base === 'e' ? Math.E : ex.base;
-      let y = Math.pow(base, -ex.a) + (ex.desplazamientoV || 0);
-      return `(0, ${y.toFixed(1)})`;
     }
     return "No disponible";
   } catch { return "Error"; }
@@ -192,14 +174,14 @@ function obtenerDominio(ex) {
     if (ex.reflexion) return `(-∞, ${ex.a}]`;
     else return `[${ex.a}, ∞)`;
   }
-  if (ex.tipo === 'lineal' || ex.tipo === 'quad' || ex.tipo === 'exp') return "ℝ";
+  if (ex.tipo === 'sqrt_frac') {
+    // El denominador no puede ser cero, y el radicando debe ser positivo
+    if (ex.reflexion) return `(-∞, ${ex.a})`; // estrictamente menor porque el denominador no puede ser cero
+    else return `(${ex.a}, ∞)`;
+  }
+  if (ex.tipo === 'lineal' || ex.tipo === 'quad') return "ℝ";
   if (ex.tipo === 'relacion') {
-    if (ex.forma === 'circulo') {
-      let r = Math.sqrt(ex.r2);
-      return `[${-r.toFixed(1)}, ${r.toFixed(1)}]`;
-    }
     if (ex.forma.includes('y2')) {
-      // Analizar expresión para dominio (condición de no negatividad)
       let latex = ex.latex;
       let match = latex.match(/y\^2\s*=\s*(.+)/);
       if (match) {
@@ -213,20 +195,16 @@ function obtenerDominio(ex) {
           } else if (derecha.includes('-')) {
             let partes = derecha.split('-');
             if (partes[0].includes('x')) {
-              // x - c
               let c = partes[1];
               return `[${parseFloat(c).toFixed(1)}, ∞)`;
             } else {
-              // c - x
               let c = partes[0];
               return `(-∞, ${parseFloat(c).toFixed(1)}]`;
             }
           } else {
-            // Solo x
             return "[0, ∞)";
           }
         } else {
-          // Constante pura
           return parseFloat(derecha) >= 0 ? "ℝ" : "∅";
         }
       }
@@ -242,6 +220,15 @@ function obtenerRango(ex) {
     let minY = ex.desplazamientoV || 0;
     return `[${minY.toFixed(1)}, ∞)`;
   }
+  if (ex.tipo === 'sqrt_frac') {
+    // La función es positiva (si num>0) y tiende a 0 en infinito, y a infinito cerca de la asíntota vertical
+    let desp = ex.desplazamientoV || 0;
+    if (ex.num > 0) {
+      return `(${desp.toFixed(1)}, ∞)`; // asíntota horizontal en y = desp
+    } else {
+      return `(-∞, ${desp.toFixed(1)})`;
+    }
+  }
   if (ex.tipo === 'lineal') {
     if (ex.m === 0) return `{${ex.b}}`;
     return "ℝ";
@@ -254,15 +241,7 @@ function obtenerRango(ex) {
       return ex.a > 0 ? `[${verticeY.toFixed(1)}, ∞)` : `(-∞, ${verticeY.toFixed(1)}]`;
     }
   }
-  if (ex.tipo === 'exp') {
-    let desp = ex.desplazamientoV || 0;
-    return `(${desp.toFixed(1)}, ∞)`;
-  }
   if (ex.tipo === 'relacion') {
-    if (ex.forma === 'circulo') {
-      let r = Math.sqrt(ex.r2);
-      return `[${-r.toFixed(1)}, ${r.toFixed(1)}]`;
-    }
     if (ex.forma.includes('y2')) {
       return "[0, ∞)";
     }
@@ -271,8 +250,8 @@ function obtenerRango(ex) {
 }
 
 function esFuncion(ex) {
-  if (ex.tipo === 'relacion' && (ex.forma === 'circulo' || ex.forma.includes('y2'))) return 1; // No es función
-  if (ex.tipo === 'producto') return 1; // No es función (relación)
+  if (ex.tipo === 'relacion' && ex.forma.includes('y2')) return 1; // No es función
+  if (ex.tipo === 'producto') return 1; // No es función
   return 0; // Es función
 }
 
@@ -320,20 +299,17 @@ function puntoPertenece(ex, x, y) {
         if (arg < 0) return false;
         let yCalcSqrt = Math.sqrt(arg) + (ex.desplazamientoV || 0);
         return Math.abs(yCalcSqrt - y) < 0.001;
-      case 'exp':
-        let base = ex.base === 'e' ? Math.E : ex.base;
-        let yCalcExp = Math.pow(base, x - ex.a) + (ex.desplazamientoV || 0);
-        return Math.abs(yCalcExp - y) < 0.001;
+      case 'sqrt_frac':
+        let argF = ex.reflexion ? ex.a - x : x - ex.a;
+        if (argF <= 0) return false; // denominador no puede ser cero ni negativo
+        let yCalcFrac = ex.num / Math.sqrt(argF) + (ex.desplazamientoV || 0);
+        return Math.abs(yCalcFrac - y) < 0.001;
       case 'relacion':
-        if (ex.forma === 'circulo') {
-          return Math.abs(x*x + y*y - ex.r2) < 0.001;
-        }
         if (ex.forma.includes('y2')) {
           let latex = ex.latex;
           let match = latex.match(/y\^2\s*=\s*(.+)/);
           if (match) {
             let derecha = match[1].replace(/\s/g, '');
-            // Evaluar lado derecho en x
             let valor;
             if (derecha.includes('x')) {
               if (derecha.includes('+')) {
@@ -343,16 +319,13 @@ function puntoPertenece(ex, x, y) {
               } else if (derecha.includes('-')) {
                 let partes = derecha.split('-');
                 if (partes[0].includes('x')) {
-                  // x - c
                   let c = partes[1];
                   valor = x - parseFloat(c);
                 } else {
-                  // c - x
                   let c = partes[0];
                   valor = parseFloat(c) - x;
                 }
               } else {
-                // Solo x
                 valor = x;
               }
             } else {
@@ -370,9 +343,9 @@ function puntoPertenece(ex, x, y) {
 function esCreciente(ex) {
   if (ex.tipo === 'lineal') return ex.m > 0;
   if (ex.tipo === 'sqrt') return !ex.reflexion;
-  if (ex.tipo === 'exp') {
-    let base = ex.base === 'e' ? Math.E : ex.base;
-    return base > 1;
+  if (ex.tipo === 'sqrt_frac') {
+    // y = num / sqrt(x - a) es decreciente; con reflexión es creciente
+    return ex.reflexion; // Si reflexion=true, entonces es creciente (porque el denominador decrece al aumentar x)
   }
   return null;
 }
@@ -384,7 +357,7 @@ function tieneMaximo(ex) {
 
 function tieneMinimo(ex) {
   if (ex.tipo === 'quad') return ex.a > 0;
-  if (ex.tipo === 'sqrt') return true;
+  if (ex.tipo === 'sqrt' || ex.tipo === 'sqrt_frac') return false; // No tienen mínimo global, tienden a infinito o asíntota
   return false;
 }
 
@@ -393,7 +366,6 @@ function tieneMinimo(ex) {
 // ------------------------------------------------------------
 function normalizarOpcion(opt) {
   if (typeof opt !== 'string') return String(opt);
-  // Normalizar puntos como (x,y) → un decimal
   let puntoMatch = opt.match(/^\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)?$/);
   if (puntoMatch) {
     let x = parseFloat(puntoMatch[1]).toFixed(1);
@@ -402,7 +374,6 @@ function normalizarOpcion(opt) {
     y = y.endsWith('.0') ? y.slice(0, -2) : y;
     return `(${x}, ${y})`;
   }
-  // Normalizar intervalos como [a,b] o (a,b)
   let intervaloMatch = opt.match(/^([\[\(])\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*([\]\)])$/);
   if (intervaloMatch) {
     let ini = parseFloat(intervaloMatch[2]).toFixed(1);
@@ -411,7 +382,6 @@ function normalizarOpcion(opt) {
     fin = fin.endsWith('.0') ? fin.slice(0, -2) : fin;
     return `${intervaloMatch[1]}${ini}, ${fin}${intervaloMatch[4]}`;
   }
-  // Normalizar números sueltos
   if (!isNaN(parseFloat(opt)) && isFinite(opt)) {
     let num = parseFloat(opt).toFixed(1);
     return num.endsWith('.0') ? num.slice(0, -2) : num;
@@ -440,6 +410,7 @@ function generarPreguntasParaEjercicio(ex) {
   }
 
   if (ex.tipo === 'producto') {
+    // ... (código existente para producto, sin cambios) ...
     let A = ex.A, B = ex.B;
     let producto = [];
     A.forEach(a => B.forEach(b => producto.push(`(${a},${b})`)));
@@ -539,7 +510,7 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: func === 0 ? "Cada x tiene una única imagen." : "Hay valores de x con dos imágenes posibles."
     });
 
-    // Pregunta 6: Vértice
+    // Pregunta 6: Vértice (solo para cuadráticas)
     if (vertice) {
       let opcionesVert = [vertice, "(0,0)", "No tiene vértice", "(1,1)"];
       let { opciones: opVert, correcta: corrVert } = crearOpciones(opcionesVert, vertice);
@@ -573,16 +544,18 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 8: Punto notable
+    // Pregunta 8: Punto notable (depende del tipo)
     let puntoNotable = null;
     if (ex.tipo === 'lineal') puntoNotable = { x: 0, y: ex.b };
     else if (ex.tipo === 'quad' && vertice) {
       let coords = vertice.replace(/[()]/g,'').split(',').map(Number);
       puntoNotable = { x: coords[0], y: coords[1] };
     } else if (ex.tipo === 'sqrt') puntoNotable = { x: ex.a, y: ex.desplazamientoV || 0 };
-    else if (ex.tipo === 'exp') {
-      let base = ex.base === 'e' ? Math.E : ex.base;
-      puntoNotable = { x: 0, y: Math.pow(base, -ex.a) + (ex.desplazamientoV || 0) };
+    else if (ex.tipo === 'sqrt_frac') {
+      // El punto donde la función vale algo, por ejemplo en x = a+1
+      let xVal = ex.reflexion ? ex.a - 1 : ex.a + 1;
+      let yVal = ex.num / Math.sqrt(1) + (ex.desplazamientoV || 0);
+      puntoNotable = { x: xVal, y: yVal };
     }
     if (puntoNotable) {
       preguntas.push({
@@ -602,7 +575,7 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: "No, porque no satisface la ecuación."
     });
 
-    // Pregunta 10: Máximo/mínimo
+    // Pregunta 10: Máximo/mínimo (solo cuadráticas)
     if (tieneMaximo(ex)) {
       preguntas.push({
         texto: "La función tiene un máximo",
@@ -615,7 +588,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: "La función tiene un mínimo",
         opciones: ["V", "F"],
         correcta: 0,
-        explicacion: "El coeficiente principal es positivo (o es una raíz), por lo que tiene un mínimo."
+        explicacion: "El coeficiente principal es positivo, por lo que tiene un mínimo."
       });
     }
 
@@ -626,7 +599,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: "La función es creciente en todo su dominio",
         opciones: ["V", "F"],
         correcta: crec ? 0 : 1,
-        explicacion: crec ? "La pendiente es positiva (o base>1, o raíz sin reflexión)." : "La pendiente es negativa o la función decrece."
+        explicacion: crec ? "La pendiente es positiva (o la función es creciente)." : "La función es decreciente."
       });
     }
 
@@ -643,7 +616,7 @@ function generarPreguntasParaEjercicio(ex) {
 
     // Pregunta 13: Pertenencia al dominio
     let xTest = -2;
-    let perteneceDom = dom.includes('ℝ') || (dom.includes('[') && xTest >= parseFloat(dom.split(',')[0].replace('[',''))) || (dom.includes(']') && xTest <= parseFloat(dom.split(',')[1].replace(']','')));
+    let perteneceDom = dom.includes('ℝ') || (dom.includes('[') && xTest >= parseFloat(dom.split(',')[0].replace('[',''))) || (dom.includes(']') && xTest <= parseFloat(dom.split(',')[1].replace(']',''))) || (dom.includes('(') && xTest > parseFloat(dom.split(',')[0].replace('(',''))) || (dom.includes(')') && xTest < parseFloat(dom.split(',')[1].replace(')','')));
     preguntas.push({
       texto: `¿El valor \\(x = ${xTest}\\) pertenece al dominio?`,
       opciones: ["Sí", "No"],
@@ -653,7 +626,7 @@ function generarPreguntasParaEjercicio(ex) {
 
     // Pregunta 14: Pertenencia al rango
     let yTest = 0;
-    let perteneceRan = ran.includes('ℝ') || (ran.includes('[') && yTest >= parseFloat(ran.split(',')[0].replace('[',''))) || (ran.includes(']') && yTest <= parseFloat(ran.split(',')[1].replace(']','')));
+    let perteneceRan = ran.includes('ℝ') || (ran.includes('[') && yTest >= parseFloat(ran.split(',')[0].replace('[',''))) || (ran.includes(']') && yTest <= parseFloat(ran.split(',')[1].replace(']',''))) || (ran.includes('(') && yTest > parseFloat(ran.split(',')[0].replace('(',''))) || (ran.includes(')') && yTest < parseFloat(ran.split(',')[1].replace(')','')));
     preguntas.push({
       texto: `¿El valor \\(y = ${yTest}\\) pertenece al rango?`,
       opciones: ["Sí", "No"],
@@ -666,7 +639,7 @@ function generarPreguntasParaEjercicio(ex) {
 }
 
 // ------------------------------------------------------------
-// INTERFAZ DE USUARIO
+// INTERFAZ DE USUARIO (sin cambios)
 // ------------------------------------------------------------
 function cargarSelector() {
   let select = document.getElementById('exerciseSelect');
@@ -687,7 +660,6 @@ function cargarEjercicio() {
   document.getElementById('mathDisplay').innerHTML = `\\( ${ex.latex} \\)`;
   if (window.MathJax) MathJax.typesetPromise();
 
-  // Ocultar/mostrar contenedor de gráfica según graficable
   let chartContainer = document.querySelector('.chart-container');
   if (ex.graficable) {
     chartContainer.style.display = 'block';
@@ -719,7 +691,7 @@ function cargarEjercicio() {
   });
 
   renderizarPreguntas();
-  if (window.MathJax) MathJax.typesetPromise(); // Forzar renderizado de las nuevas preguntas
+  if (window.MathJax) MathJax.typesetPromise();
   respuestasUsuario = new Array(preguntasActuales.length).fill(null);
   document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
@@ -782,7 +754,7 @@ function verificarTodo() {
   });
 
   if (window.MathJax) {
-    MathJax.typesetPromise(); // Renderizar LaTeX en feedbacks
+    MathJax.typesetPromise();
   }
 
   let total = preguntasActuales.length;
@@ -813,26 +785,18 @@ function reiniciarTodo() {
 }
 
 // ------------------------------------------------------------
-// FUNCIONES AUXILIARES PARA GRÁFICAS
+// FUNCIONES AUXILIARES PARA GRÁFICAS (con sqrt_frac)
 // ------------------------------------------------------------
 function calcularPuntosNotables(ex) {
   let puntos = [];
   try {
     if (ex.tipo === 'producto') return puntos;
     if (ex.tipo === 'relacion') {
-      if (ex.forma === 'circulo') {
-        let r = Math.sqrt(ex.r2);
-        puntos.push({ x: r, y: 0, label: `(${r.toFixed(2)},0)` });
-        puntos.push({ x: -r, y: 0, label: `(${-r.toFixed(2)},0)` });
-        puntos.push({ x: 0, y: r, label: `(0,${r.toFixed(2)})` });
-        puntos.push({ x: 0, y: -r, label: `(0,${-r.toFixed(2)})` });
-      } else if (ex.forma.includes('y2')) {
-        // Calcular puntos notables analizando la ecuación
+      if (ex.forma.includes('y2')) {
         let latex = ex.latex;
         let match = latex.match(/y\^2\s*=\s*(.+)/);
         if (match) {
           let derecha = match[1].replace(/\s/g, '');
-          // Vértice (inicio) de la parábola
           if (derecha.includes('x')) {
             if (derecha.includes('+')) {
               let partes = derecha.split('+');
@@ -849,11 +813,9 @@ function calcularPuntosNotables(ex) {
                 puntos.push({ x: c, y: 0, label: `(${c},0)` });
               }
             } else {
-              // Solo x
               puntos.push({ x: 0, y: 0, label: "(0,0)" });
             }
           } else {
-            // Constante
             let c = parseFloat(derecha);
             if (c > 0) {
               puntos.push({ x: 0, y: Math.sqrt(c), label: `(0,${Math.sqrt(c).toFixed(2)})` });
@@ -875,6 +837,24 @@ function calcularPuntosNotables(ex) {
       }
       return puntos;
     }
+    if (ex.tipo === 'sqrt_frac') {
+      // Punto inicial del dominio: x = a (asíntota vertical)
+      let x0 = ex.a;
+      puntos.push({ x: x0, y: null, label: `Asíntota x = ${x0}` }); // No se grafica, solo referencia
+      // Corte con Y si existe
+      let argY = ex.reflexion ? ex.a - 0 : 0 - ex.a;
+      if (argY > 0) {
+        let y = ex.num / Math.sqrt(argY) + (ex.desplazamientoV || 0);
+        puntos.push({ x: 0, y: y, label: `(0,${y.toFixed(2)})` });
+      }
+      // Un punto adicional, por ejemplo en x = a+1 (o a-1 según reflexión)
+      let x1 = ex.reflexion ? ex.a - 1 : ex.a + 1;
+      if ((ex.reflexion && x1 < ex.a) || (!ex.reflexion && x1 > ex.a)) {
+        let y1 = ex.num / Math.sqrt(1) + (ex.desplazamientoV || 0);
+        puntos.push({ x: x1, y: y1, label: `(${x1.toFixed(2)},${y1.toFixed(2)})` });
+      }
+      return puntos;
+    }
     if (ex.tipo === 'lineal') {
       if (ex.m !== 0) {
         let x = -ex.b / ex.m;
@@ -884,6 +864,7 @@ function calcularPuntosNotables(ex) {
       return puntos;
     }
     if (ex.tipo === 'quad') {
+      // ... (código existente para quad, sin cambios) ...
       if (ex.h !== undefined) {
         let xv = ex.h;
         let yv = ex.k;
@@ -917,13 +898,6 @@ function calcularPuntosNotables(ex) {
       }
       return puntos;
     }
-    if (ex.tipo === 'exp') {
-      let asintota = ex.desplazamientoV || 0;
-      let base = ex.base === 'e' ? Math.E : ex.base;
-      let y0 = Math.pow(base, -ex.a) + asintota;
-      puntos.push({ x: 0, y: y0, label: `(0,${y0.toFixed(2)})` });
-      return puntos;
-    }
   } catch (e) {
     console.error("Error calculando puntos notables", e);
   }
@@ -932,13 +906,12 @@ function calcularPuntosNotables(ex) {
 
 function calcularLimitesX(ex, puntosNotables) {
   let xs = [];
-  puntosNotables.forEach(p => xs.push(p.x));
+  puntosNotables.forEach(p => {
+    if (p.x !== null && isFinite(p.x)) xs.push(p.x);
+  });
   xs.push(0);
   if (ex.tipo === 'sqrt') xs.push(ex.a);
-  if (ex.tipo === 'relacion' && ex.forma === 'circulo') {
-    let r = Math.sqrt(ex.r2);
-    xs.push(-r, r);
-  }
+  if (ex.tipo === 'sqrt_frac') xs.push(ex.a); // asíntota
   if (ex.tipo === 'relacion' && ex.forma.includes('y2')) {
     let latex = ex.latex;
     let match = latex.match(/y\^2\s*=\s*(.+)/);
@@ -1006,7 +979,7 @@ function generarGrafica() {
   let idx = parseInt(document.getElementById('exerciseSelect').value) || 0;
   if (ejercicios.length === 0) return;
   let ex = ejercicios[idx];
-  if (!ex.graficable) return; // No hacer nada si no es graficable
+  if (!ex.graficable) return;
 
   let canvas = document.getElementById('mainChart');
   if (!canvas) return;
@@ -1042,18 +1015,12 @@ function generarGrafica() {
           let argumento = ex.reflexion ? ex.a - x : x - ex.a;
           if (argumento >= 0) y = Math.sqrt(argumento) + (ex.desplazamientoV || 0);
           break;
-        case 'exp':
-          let base = ex.base === 'e' ? Math.E : ex.base;
-          y = Math.pow(base, x - ex.a) + (ex.desplazamientoV || 0);
+        case 'sqrt_frac':
+          let argF = ex.reflexion ? ex.a - x : x - ex.a;
+          if (argF > 0) y = ex.num / Math.sqrt(argF) + (ex.desplazamientoV || 0);
           break;
         case 'relacion':
-          if (ex.forma === 'circulo') {
-            let r = Math.sqrt(ex.r2);
-            if (Math.abs(x) <= r) {
-              y = Math.sqrt(r * r - x * x);
-              yNeg = -Math.sqrt(r * r - x * x);
-            }
-          } else if (ex.forma.includes('y2')) {
+          if (ex.forma.includes('y2')) {
             let latex = ex.latex;
             let match = latex.match(/y\^2\s*=\s*(.+)/);
             if (match) {
@@ -1122,7 +1089,7 @@ function generarGrafica() {
 
   if (puntosNotables.length > 0) {
     const puntosVisibles = puntosNotables
-      .filter(p => p.y >= limitesY.min && p.y <= limitesY.max)
+      .filter(p => p.y !== null && p.y >= limitesY.min && p.y <= limitesY.max)
       .map(p => ({ x: redondear(p.x), y: redondear(p.y) }));
     if (puntosVisibles.length > 0) {
       datasets.push({
@@ -1176,7 +1143,7 @@ function generarGrafica() {
 }
 
 // ------------------------------------------------------------
-// MODO OSCURO
+// MODO OSCURO (sin cambios)
 // ------------------------------------------------------------
 function initDarkMode() {
   const toggleButtons = ['darkModeToggle', 'darkModeFloating'];
