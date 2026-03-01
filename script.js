@@ -21,6 +21,22 @@ function redondear(num) {
 }
 
 // ------------------------------------------------------------
+// FUNCIÓN PARA CONVERTIR A LATEX (sin doble envoltura)
+// ------------------------------------------------------------
+function toLatex(s) {
+  if (typeof s !== 'string') return s;
+  // Si ya está envuelto, lo dejamos igual
+  if (s.startsWith('\\(') && s.endsWith('\\)')) return s;
+  // Reemplazar símbolos Unicode por comandos LaTeX
+  let processed = s.replace(/∞/g, '\\infty').replace(/ℝ/g, '\\mathbb{R}');
+  // Si contiene caracteres matemáticos, lo envolvemos
+  if (/[0-9\(\)\[\]\{\}\,∞\-\+\^=]|\\infty|\\mathbb/.test(processed)) {
+    return '\\(' + processed + '\\)';
+  }
+  return s;
+}
+
+// ------------------------------------------------------------
 // CARGA DE EJERCICIOS DESDE JSON
 // ------------------------------------------------------------
 async function cargarEjercicios() {
@@ -552,8 +568,10 @@ function tieneMinimo(ex) {
 // ------------------------------------------------------------
 function normalizarOpcion(opt) {
   if (typeof opt !== 'string') return String(opt);
+  // Quitar posibles delimitadores LaTeX
+  let raw = opt.replace(/^\\\(|\\\)$/g, '');
   // Normalizar puntos (x,y)
-  let puntoMatch = opt.match(/^\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)?$/);
+  let puntoMatch = raw.match(/^\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)?$/);
   if (puntoMatch) {
     let x = parseFloat(puntoMatch[1]);
     let y = parseFloat(puntoMatch[2]);
@@ -564,7 +582,7 @@ function normalizarOpcion(opt) {
     return `(${xStr}, ${yStr})`;
   }
   // Normalizar intervalos con posibles infinitos
-  let intervaloInfMatch = opt.match(/^([\[\(])\s*(-?(?:\d+\.?\d*|∞))\s*,\s*(-?(?:\d+\.?\d*|∞))\s*([\]\)])$/);
+  let intervaloInfMatch = raw.match(/^([\[\(])\s*(-?(?:\d+\.?\d*|∞))\s*,\s*(-?(?:\d+\.?\d*|∞))\s*([\]\)])$/);
   if (intervaloInfMatch) {
     let left = intervaloInfMatch[1];
     let inf1 = intervaloInfMatch[2];
@@ -584,16 +602,16 @@ function normalizarOpcion(opt) {
     return `${left}${inf1},${inf2}${right}`;
   }
   // Normalizar números sueltos
-  if (!isNaN(parseFloat(opt)) && isFinite(opt)) {
-    let num = parseFloat(opt);
+  if (!isNaN(parseFloat(raw)) && isFinite(raw)) {
+    let num = parseFloat(raw);
     num = Math.round(num * 10) / 10;
     return num % 1 === 0 ? num.toString() : num.toFixed(1);
   }
-  return opt;
+  return raw;
 }
 
 // ------------------------------------------------------------
-// GENERAR PREGUNTAS (con opciones únicas)
+// GENERAR PREGUNTAS (con opciones únicas y explicaciones con LaTeX)
 // ------------------------------------------------------------
 function generarPreguntasParaEjercicio(ex) {
   let preguntas = [];
@@ -724,7 +742,7 @@ function generarPreguntasParaEjercicio(ex) {
       texto: "Punto de corte con eje X",
       opciones: opX,
       correcta: corrX,
-      explicacion: `Para hallar corte con X, hacemos y=0. Resolviendo se obtiene: ${cx}.`
+      explicacion: `Para hallar corte con X, hacemos y=0. Resolviendo se obtiene: \\(${cx}\\).`
     });
 
     // Pregunta 2: Corte con Y
@@ -734,7 +752,7 @@ function generarPreguntasParaEjercicio(ex) {
       texto: "Punto de corte con eje Y",
       opciones: opY,
       correcta: corrY,
-      explicacion: `Para hallar corte con Y, hacemos x=0. Se obtiene: ${cy}.`
+      explicacion: `Para hallar corte con Y, hacemos x=0. Se obtiene: \\(${cy}\\).`
     });
 
     // Pregunta 3: Dominio
@@ -744,7 +762,7 @@ function generarPreguntasParaEjercicio(ex) {
       texto: "Dominio (intervalo)",
       opciones: opDom,
       correcta: corrDom,
-      explicacion: `El dominio es ${dom}.`
+      explicacion: `El dominio es \\(${dom}\\).`
     });
 
     // Pregunta 4: Rango
@@ -754,7 +772,7 @@ function generarPreguntasParaEjercicio(ex) {
       texto: "Rango (intervalo)",
       opciones: opRan,
       correcta: corrRan,
-      explicacion: `El rango es ${ran}.`
+      explicacion: `El rango es \\(${ran}\\).`
     });
 
     // Pregunta 5: ¿Es función?
@@ -775,7 +793,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: "Coordenadas del vértice",
         opciones: opVert,
         correcta: corrVert,
-        explicacion: `El vértice es ${vertice}.`
+        explicacion: `El vértice es \\(${vertice}\\).`
       });
     }
 
@@ -787,7 +805,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: "Ecuación de la asíntota vertical",
         opciones: opAsint,
         correcta: corrAsint,
-        explicacion: `La asíntota vertical está en ${asintota}.`
+        explicacion: `La asíntota vertical está en \\(${asintota}\\).`
       });
     }
 
@@ -801,7 +819,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: "Valor del discriminante",
         opciones: opDisc,
         correcta: corrDisc,
-        explicacion: `Δ = ${discVal}. Como Δ ${discriminante > 0 ? '>' : (discriminante === 0 ? '=' : '<')} 0, la ecuación tiene ${regla}.`
+        explicacion: `\\(\\Delta = ${discVal}\\). Como \\(\\Delta ${discriminante > 0 ? '>' : (discriminante === 0 ? '=' : '<')} 0\\), la ecuación tiene ${regla}.`
       });
     }
 
@@ -813,7 +831,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: "Coordenadas del centro",
         opciones: opCentro,
         correcta: corrCentro,
-        explicacion: `El centro es ${centro}.`
+        explicacion: `El centro es \\(${centro}\\).`
       });
     }
 
@@ -825,7 +843,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: ex.tipo === 'circunferencia' ? "Radio" : "Semiejes",
         opciones: opRadio,
         correcta: corrRadio,
-        explicacion: `${ex.tipo === 'circunferencia' ? 'El radio es' : 'Los semiejes son'} ${radioSemiejes}.`
+        explicacion: `${ex.tipo === 'circunferencia' ? 'El radio es' : 'Los semiejes son'} \\(${radioSemiejes}\\).`
       });
     }
 
@@ -881,12 +899,12 @@ function generarPreguntasParaEjercicio(ex) {
       });
     }
 
-    // Pregunta 13: Punto falso
-    let xFalso = 5, yFalso = 5;
+    // Pregunta 13: Punto falso (dinámico)
+    let puntoFalso = generarPuntoFalso(ex);
     let base13 = ["Sí", "No"];
     let { opciones: op13, correcta: corr13 } = crearOpciones(base13, "No");
     preguntas.push({
-      texto: `¿El punto \\((${xFalso}, ${yFalso})\\) pertenece a la función?`,
+      texto: `¿El punto \\(${puntoFalso.str}\\) pertenece a la función?`,
       opciones: op13,
       correcta: corr13,
       explicacion: "No, porque no satisface la ecuación."
@@ -935,7 +953,7 @@ function generarPreguntasParaEjercicio(ex) {
         texto: `¿La ecuación \\(y^2 = ${expr}\\) es equivalente a la función?`,
         opciones: op16,
         correcta: corr16,
-        explicacion: "No, porque $y^2 = ...$ representa dos ramas, mientras que la función raíz cuadrada da solo la rama positiva."
+        explicacion: "No, porque \\(y^2 = ...\\) representa dos ramas, mientras que la función raíz cuadrada da solo la rama positiva."
       });
     }
 
@@ -948,7 +966,7 @@ function generarPreguntasParaEjercicio(ex) {
       texto: `¿El valor \\(x = ${xTest}\\) pertenece al dominio?`,
       opciones: op17,
       correcta: corr17,
-      explicacion: `El dominio es ${dom}, por lo tanto ${perteneceDom ? 'sí' : 'no'} pertenece.`
+      explicacion: `El dominio es \\(${dom}\\), por lo tanto ${perteneceDom ? 'sí' : 'no'} pertenece.`
     });
 
     // Pregunta 18: Pertenencia al rango
@@ -960,7 +978,7 @@ function generarPreguntasParaEjercicio(ex) {
       texto: `¿El valor \\(y = ${yTest}\\) pertenece al rango?`,
       opciones: op18,
       correcta: corr18,
-      explicacion: `El rango es ${ran}, por lo tanto ${perteneceRan ? 'sí' : 'no'} pertenece.`
+      explicacion: `El rango es \\(${ran}\\), por lo tanto ${perteneceRan ? 'sí' : 'no'} pertenece.`
     });
 
     // Preguntas extra para tipos que resulten impares después de lo anterior
@@ -989,6 +1007,33 @@ function generarPreguntasParaEjercicio(ex) {
   }
 
   return preguntas;
+}
+
+// ------------------------------------------------------------
+// GENERAR UN PUNTO FALSO QUE NO PERTENEZCA A LA FUNCIÓN
+// ------------------------------------------------------------
+function generarPuntoFalso(ex) {
+  // Lista de candidatos comunes
+  const candidatos = [
+    [0,0], [1,1], [2,2], [3,3], [4,4], [5,5],
+    [-1,-1], [0,1], [1,0], [-2,-2], [2,-2], [-2,2],
+    [0,5], [5,0], [-5,-5], [10,10]
+  ];
+  for (let [x, y] of candidatos) {
+    if (!puntoPertenece(ex, x, y)) {
+      return { x, y, str: `(${x.toFixed(1)}, ${y.toFixed(1)})` };
+    }
+  }
+  // Fallback: puntos aleatorios
+  for (let intento = 0; intento < 100; intento++) {
+    let x = Math.round((Math.random() * 20 - 10) * 10) / 10;
+    let y = Math.round((Math.random() * 20 - 10) * 10) / 10;
+    if (!puntoPertenece(ex, x, y)) {
+      return { x, y, str: `(${x.toFixed(1)}, ${y.toFixed(1)})` };
+    }
+  }
+  // Último recurso
+  return { x: 99, y: 99, str: "(99.0, 99.0)" };
 }
 
 // ------------------------------------------------------------
@@ -1085,10 +1130,11 @@ function renderizarPreguntas() {
 
     let opcionesHtml = '';
     p.opciones.forEach((opt, oIdx) => {
+      let displayOpt = toLatex(opt);
       opcionesHtml += `
         <div class="form-check">
           <input class="form-check-input" type="radio" name="preg_${idx}" id="radio_${idx}_${oIdx}" value="${oIdx}" onchange="guardarRespuesta(${idx}, ${oIdx})">
-          <label class="form-check-label" for="radio_${idx}_${oIdx}">${opt}</label>
+          <label class="form-check-label" for="radio_${idx}_${oIdx}">${displayOpt}</label>
         </div>
       `;
     });
@@ -1124,7 +1170,7 @@ function verificarTodo() {
       correctas++;
     } else {
       feedback.className = 'feedback incorrecto';
-      feedback.innerHTML = `<i class="bi bi-x-circle"></i> Incorrecto. La respuesta correcta es: ${p.opciones[p.correcta]}<div class="explicacion">${p.explicacion}</div>`;
+      feedback.innerHTML = `<i class="bi bi-x-circle"></i> Incorrecto. La respuesta correcta es: ${toLatex(p.opciones[p.correcta])}<div class="explicacion">${p.explicacion}</div>`;
       item.style.borderLeftColor = 'var(--danger)';
     }
   });
