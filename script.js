@@ -11,6 +11,7 @@ let ejercicios = [];
 let preguntasActuales = [];
 let respuestasUsuario = [];
 let chartInstance = null;
+let ejerciciosCompletados = [];
 
 // ------------------------------------------------------------
 // FUNCIÓN DE REDONDEO
@@ -27,12 +28,19 @@ async function cargarEjercicios() {
     const response = await fetch('ejercicios.json');
     ejercicios = await response.json();
     ejercicios.forEach((ex, idx) => ex.id = idx);
+    // Cargar estado de completados desde localStorage
+    const stored = localStorage.getItem('completados');
+    ejerciciosCompletados = stored ? JSON.parse(stored) : [];
   } catch (error) {
     console.error('Error cargando ejercicios:', error);
     ejercicios = [];
   }
   cargarSelector();
   cargarEjercicio();
+}
+
+function guardarCompletados() {
+  localStorage.setItem('completados', JSON.stringify(ejerciciosCompletados));
 }
 
 // ------------------------------------------------------------
@@ -609,69 +617,91 @@ function generarPreguntasParaEjercicio(ex) {
     let producto = [];
     A.forEach(a => B.forEach(b => producto.push(`(${a},${b})`)));
 
+    // Cardinalidad de A × B
+    let base1 = [String(A.length * B.length), "|A|+|B|", "|A|", "|B|"];
+    let { opciones: op1, correcta: corr1 } = crearOpciones(base1, String(A.length * B.length));
     preguntas.push({
       texto: "Cardinalidad de A × B",
-      opciones: [String(A.length * B.length), "|A|+|B|", "|A|", "|B|"],
-      correcta: 0,
+      opciones: op1,
+      correcta: corr1,
       explicacion: `A tiene ${A.length} elementos, B tiene ${B.length}. |A×B| = ${A.length} × ${B.length} = ${A.length * B.length}.`
     });
 
+    // Par sí
     let parSi = producto[0];
+    let base2 = ["Sí", "No"];
+    let { opciones: op2, correcta: corr2 } = crearOpciones(base2, "Sí");
     preguntas.push({
       texto: `¿El par ${parSi} pertenece a A × B?`,
-      opciones: ["Sí", "No"],
-      correcta: 0,
+      opciones: op2,
+      correcta: corr2,
       explicacion: `Sí, porque se forma con un elemento de A y otro de B.`
     });
 
-    let b0 = B[0];
-    let a0 = A[0];
+    // B × A (sí)
+    let b0 = B[0], a0 = A[0];
+    let base3 = ["Sí", "No"];
+    let { opciones: op3, correcta: corr3 } = crearOpciones(base3, "Sí");
     preguntas.push({
       texto: `¿El par (${b0}, ${a0}) pertenece a B × A?`,
-      opciones: ["Sí", "No"],
-      correcta: 0,
+      opciones: op3,
+      correcta: corr3,
       explicacion: `Sí, porque ${b0} ∈ B y ${a0} ∈ A.`
     });
 
+    // Par que no pertenece a B × A
     let maxA = Math.max(...A);
     let noA = maxA + 1;
     let parNoBA = `(${b0}, ${noA})`;
+    let base4 = ["Sí", "No"];
+    let { opciones: op4, correcta: corr4 } = crearOpciones(base4, "No");
     preguntas.push({
       texto: `¿El par ${parNoBA} pertenece a B × A?`,
-      opciones: ["Sí", "No"],
-      correcta: 1,
+      opciones: op4,
+      correcta: corr4,
       explicacion: `No, porque ${noA} no pertenece a A (A = {${A.join(', ')}}).`
     });
 
+    // A ⊆ B
     let aSubB = A.every(val => B.includes(val));
+    let base5 = ["Sí", "No"];
+    let { opciones: op5, correcta: corr5 } = crearOpciones(base5, aSubB ? "Sí" : "No");
     preguntas.push({
       texto: "¿A ⊆ B?",
-      opciones: ["Sí", "No"],
-      correcta: aSubB ? 0 : 1,
+      opciones: op5,
+      correcta: corr5,
       explicacion: aSubB ? "Todos los elementos de A están en B." : "Hay elementos de A que no están en B."
     });
 
+    // A × B igual a B × A
     let igual = (A.length === B.length) && A.every(v => B.includes(v)) && B.every(v => A.includes(v));
+    let base6 = ["V", "F"];
+    let { opciones: op6, correcta: corr6 } = crearOpciones(base6, igual ? "V" : "F");
     preguntas.push({
       texto: "A × B es igual a B × A",
-      opciones: ["V", "F"],
-      correcta: igual ? 0 : 1,
+      opciones: op6,
+      correcta: corr6,
       explicacion: igual ? "Los conjuntos son iguales porque A = B." : "El producto cartesiano no es conmutativo, salvo que A = B."
     });
 
+    // Representa función
     let esFunc = (B.length === 1);
+    let base7 = ["V", "F"];
+    let { opciones: op7, correcta: corr7 } = crearOpciones(base7, esFunc ? "V" : "F");
     preguntas.push({
       texto: "A × B representa una función de A en B",
-      opciones: ["V", "F"],
-      correcta: esFunc ? 0 : 1,
+      opciones: op7,
+      correcta: corr7,
       explicacion: esFunc ? "Cada elemento de A se relaciona con un único elemento de B." : "Cada elemento de A se relaciona con varios elementos de B, por lo que no es función."
     });
 
-    // Pregunta extra para que el total sea par
+    // Cardinalidad de A
+    let base8 = [String(A.length), String(B.length), String(A.length + B.length), String(A.length * B.length)];
+    let { opciones: op8, correcta: corr8 } = crearOpciones(base8, String(A.length));
     preguntas.push({
       texto: "Cardinalidad del conjunto A",
-      opciones: [String(A.length), String(B.length), String(A.length + B.length), String(A.length * B.length)],
-      correcta: 0,
+      opciones: op8,
+      correcta: corr8,
       explicacion: `A tiene ${A.length} elementos.`
     });
 
@@ -728,10 +758,12 @@ function generarPreguntasParaEjercicio(ex) {
     });
 
     // Pregunta 5: ¿Es función?
+    let base5 = ["Sí", "No"];
+    let { opciones: op5, correcta: corr5 } = crearOpciones(base5, func === 0 ? "Sí" : "No");
     preguntas.push({
       texto: "¿Representa una función?",
-      opciones: ["Sí", "No"],
-      correcta: func,
+      opciones: op5,
+      correcta: corr5,
       explicacion: func === 0 ? "Cada x tiene una única imagen." : "Hay valores de x con dos imágenes posibles."
     });
 
@@ -809,12 +841,11 @@ function generarPreguntasParaEjercicio(ex) {
         `\\(F = \\{(x, y) : y = ${expr}, x \\in ${dom}, y \\in ${ranErr}\\}\\)`,
         `\\(F = \\{(x, y) : x = ${expr}, y \\in ${dom}, x \\in ${ran}\\}\\)`
       ];
-      let unicas = [...new Set(opcionesRepr)];
-      let correctIndex = unicas.indexOf(repr);
+      let { opciones: opRepr, correcta: corrRepr } = crearOpciones(opcionesRepr, repr);
       preguntas.push({
         texto: "Selecciona la representación por comprensión correcta de la función:",
-        opciones: unicas,
-        correcta: correctIndex,
+        opciones: opRepr,
+        correcta: corrRepr,
         explicacion: "La notación correcta debe incluir la ecuación y el dominio y rango adecuados."
       });
     }
@@ -840,36 +871,44 @@ function generarPreguntasParaEjercicio(ex) {
       puntoNotable = { x: 0, y: 1 + (ex.desplazamientoV || 0) };
     }
     if (puntoNotable) {
+      let base12 = ["Sí", "No"];
+      let { opciones: op12, correcta: corr12 } = crearOpciones(base12, "Sí");
       preguntas.push({
         texto: `¿El punto \\((${puntoNotable.x.toFixed(1)}, ${puntoNotable.y.toFixed(1)})\\) pertenece a la función?`,
-        opciones: ["Sí", "No"],
-        correcta: 0,
+        opciones: op12,
+        correcta: corr12,
         explicacion: "Sí, porque satisface la ecuación."
       });
     }
 
     // Pregunta 13: Punto falso
     let xFalso = 5, yFalso = 5;
+    let base13 = ["Sí", "No"];
+    let { opciones: op13, correcta: corr13 } = crearOpciones(base13, "No");
     preguntas.push({
       texto: `¿El punto \\((${xFalso}, ${yFalso})\\) pertenece a la función?`,
-      opciones: ["Sí", "No"],
-      correcta: 1,
+      opciones: op13,
+      correcta: corr13,
       explicacion: "No, porque no satisface la ecuación."
     });
 
     // Pregunta 14: Máximo/mínimo (solo cuadráticas)
     if (tieneMaximo(ex)) {
+      let base14 = ["V", "F"];
+      let { opciones: op14, correcta: corr14 } = crearOpciones(base14, "V");
       preguntas.push({
         texto: "La función tiene un máximo",
-        opciones: ["V", "F"],
-        correcta: 0,
+        opciones: op14,
+        correcta: corr14,
         explicacion: "El coeficiente principal es negativo, por lo que la parábola abre hacia abajo y tiene un máximo en el vértice."
       });
     } else if (tieneMinimo(ex)) {
+      let base14 = ["V", "F"];
+      let { opciones: op14, correcta: corr14 } = crearOpciones(base14, "V");
       preguntas.push({
         texto: "La función tiene un mínimo",
-        opciones: ["V", "F"],
-        correcta: 0,
+        opciones: op14,
+        correcta: corr14,
         explicacion: "El coeficiente principal es positivo, por lo que tiene un mínimo."
       });
     }
@@ -877,10 +916,12 @@ function generarPreguntasParaEjercicio(ex) {
     // Pregunta 15: Monotonía (para lineales, sqrt, exponencial)
     let crec = esCreciente(ex);
     if (crec !== null) {
+      let base15 = ["V", "F"];
+      let { opciones: op15, correcta: corr15 } = crearOpciones(base15, crec ? "V" : "F");
       preguntas.push({
         texto: "La función es creciente en todo su dominio",
-        opciones: ["V", "F"],
-        correcta: crec ? 0 : 1,
+        opciones: op15,
+        correcta: corr15,
         explicacion: crec ? "La pendiente es positiva (o la función es creciente)." : "La función es decreciente."
       });
     }
@@ -888,10 +929,12 @@ function generarPreguntasParaEjercicio(ex) {
     // Pregunta 16: Comparación con relación (solo para sqrt)
     if (ex.tipo === 'sqrt') {
       let expr = obtenerExpresionDerecha(ex).replace(/\\sqrt/g, '');
+      let base16 = ["Sí", "No"];
+      let { opciones: op16, correcta: corr16 } = crearOpciones(base16, "No");
       preguntas.push({
         texto: `¿La ecuación \\(y^2 = ${expr}\\) es equivalente a la función?`,
-        opciones: ["Sí", "No"],
-        correcta: 1,
+        opciones: op16,
+        correcta: corr16,
         explicacion: "No, porque $y^2 = ...$ representa dos ramas, mientras que la función raíz cuadrada da solo la rama positiva."
       });
     }
@@ -899,39 +942,47 @@ function generarPreguntasParaEjercicio(ex) {
     // Pregunta 17: Pertenencia al dominio
     let xTest = -2;
     let perteneceDom = dom.includes('ℝ') || (dom.includes('[') && xTest >= parseFloat(dom.split(',')[0].replace('[', ''))) || (dom.includes(']') && xTest <= parseFloat(dom.split(',')[1].replace(']', ''))) || (dom.includes('(') && xTest > parseFloat(dom.split(',')[0].replace('(', ''))) || (dom.includes(')') && xTest < parseFloat(dom.split(',')[1].replace(')', '')));
+    let base17 = ["Sí", "No"];
+    let { opciones: op17, correcta: corr17 } = crearOpciones(base17, perteneceDom ? "Sí" : "No");
     preguntas.push({
       texto: `¿El valor \\(x = ${xTest}\\) pertenece al dominio?`,
-      opciones: ["Sí", "No"],
-      correcta: perteneceDom ? 0 : 1,
+      opciones: op17,
+      correcta: corr17,
       explicacion: `El dominio es ${dom}, por lo tanto ${perteneceDom ? 'sí' : 'no'} pertenece.`
     });
 
     // Pregunta 18: Pertenencia al rango
     let yTest = 0;
     let perteneceRan = ran.includes('ℝ') || (ran.includes('[') && yTest >= parseFloat(ran.split(',')[0].replace('[', ''))) || (ran.includes(']') && yTest <= parseFloat(ran.split(',')[1].replace(']', ''))) || (ran.includes('(') && yTest > parseFloat(ran.split(',')[0].replace('(', ''))) || (ran.includes(')') && yTest < parseFloat(ran.split(',')[1].replace(')', '')));
+    let base18 = ["Sí", "No"];
+    let { opciones: op18, correcta: corr18 } = crearOpciones(base18, perteneceRan ? "Sí" : "No");
     preguntas.push({
       texto: `¿El valor \\(y = ${yTest}\\) pertenece al rango?`,
-      opciones: ["Sí", "No"],
-      correcta: perteneceRan ? 0 : 1,
+      opciones: op18,
+      correcta: corr18,
       explicacion: `El rango es ${ran}, por lo tanto ${perteneceRan ? 'sí' : 'no'} pertenece.`
     });
 
     // Preguntas extra para tipos que resulten impares después de lo anterior
     if (ex.tipo === 'circunferencia' || ex.tipo === 'elipse') {
       let simX = (ex.centro[1] === 0);
+      let base19 = ["Sí", "No"];
+      let { opciones: op19, correcta: corr19 } = crearOpciones(base19, simX ? "Sí" : "No");
       preguntas.push({
         texto: "¿La curva es simétrica respecto al eje X?",
-        opciones: ["Sí", "No"],
-        correcta: simX ? 0 : 1,
+        opciones: op19,
+        correcta: corr19,
         explicacion: simX ? "Sí, porque el centro está sobre el eje X." : "No, porque el centro no está sobre el eje X."
       });
     }
 
     if (ex.tipo === 'exponential') {
+      let base20 = ["Sí", "No"];
+      let { opciones: op20, correcta: corr20 } = crearOpciones(base20, "No");
       preguntas.push({
         texto: "¿La función tiene un máximo o mínimo?",
-        opciones: ["Sí", "No"],
-        correcta: 1,
+        opciones: op20,
+        correcta: corr20,
         explicacion: "Las funciones exponenciales son monótonas y no tienen máximos ni mínimos locales."
       });
     }
@@ -997,6 +1048,29 @@ function cargarEjercicio() {
   respuestasUsuario = new Array(preguntasActuales.length).fill(null);
   document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
+
+  // Actualizar estado de completado
+  const completado = ejerciciosCompletados.includes(idx);
+  const completedBadge = document.getElementById('completedBadge');
+  if (completedBadge) {
+    completedBadge.style.display = completado ? 'inline-block' : 'none';
+  }
+
+  // Deshabilitar elementos si está completado
+  const radios = document.querySelectorAll('input[type="radio"]');
+  const btnVerify = document.querySelectorAll('.btn-success[onclick="verificarTodo()"]');
+  const btnReiniciar = document.querySelector('.btn-light[onclick="reiniciarTodo()"]');
+  if (completado) {
+    radios.forEach(r => r.disabled = true);
+    btnVerify.forEach(b => b.disabled = true);
+    if (btnReiniciar) btnReiniciar.disabled = true;
+  } else {
+    radios.forEach(r => r.disabled = false);
+    btnVerify.forEach(b => b.disabled = false);
+    if (btnReiniciar) btnReiniciar.disabled = false;
+  }
+
+  actualizarBotonesNavegacion();
 }
 
 function renderizarPreguntas() {
@@ -1066,6 +1140,15 @@ function verificarTodo() {
   globalDiv.className = `alert d-block mt-5 text-center shadow-lg border-0 py-4 ${correctas === total ? 'alert-success' : 'alert-info'}`;
   globalDiv.innerHTML = `<h4>Resultado: ${correctas} / ${total} (${porcentaje}%)</h4><p class="mb-0">Sigue practicando para perfeccionar tu análisis funcional.</p>`;
   globalDiv.classList.remove('d-none');
+
+  // Si todas son correctas, marcar ejercicio como completado
+  let idx = parseInt(document.getElementById('exerciseSelect').value);
+  if (correctas === total && !ejerciciosCompletados.includes(idx)) {
+    ejerciciosCompletados.push(idx);
+    guardarCompletados();
+    cargarEjercicio(); // recarga para aplicar deshabilitados
+  }
+
   actualizarProgreso(correctas);
 }
 
@@ -1075,6 +1158,12 @@ function actualizarProgreso(correctas) {
 }
 
 function reiniciarTodo() {
+  // No reiniciar si el ejercicio está completado
+  let idx = parseInt(document.getElementById('exerciseSelect').value);
+  if (ejerciciosCompletados.includes(idx)) {
+    alert('Este ejercicio ya fue completado. No se puede reiniciar.');
+    return;
+  }
   respuestasUsuario.fill(null);
   document.querySelectorAll('input[type="radio"]').forEach(r => (r.checked = false));
   document.querySelectorAll('[id^="feedback-"]').forEach(el => {
@@ -1084,6 +1173,32 @@ function reiniciarTodo() {
   document.querySelectorAll('.pregunta-item').forEach(item => (item.style.borderLeftColor = 'var(--primary)'));
   document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
+}
+
+function actualizarBotonesNavegacion() {
+  let idx = parseInt(document.getElementById('exerciseSelect').value);
+  const btnPrev = document.getElementById('btnPrev');
+  const btnNext = document.getElementById('btnNext');
+  if (btnPrev) btnPrev.disabled = idx === 0;
+  if (btnNext) btnNext.disabled = idx === ejercicios.length - 1;
+}
+
+function ejercicioAnterior() {
+  let select = document.getElementById('exerciseSelect');
+  let idx = parseInt(select.value);
+  if (idx > 0) {
+    select.value = idx - 1;
+    cargarEjercicio();
+  }
+}
+
+function ejercicioSiguiente() {
+  let select = document.getElementById('exerciseSelect');
+  let idx = parseInt(select.value);
+  if (idx < ejercicios.length - 1) {
+    select.value = idx + 1;
+    cargarEjercicio();
+  }
 }
 
 // ------------------------------------------------------------
