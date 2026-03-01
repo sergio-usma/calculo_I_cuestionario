@@ -1,7 +1,7 @@
 // ------------------------------------------------------------
 // CONSTANTES DE CONFIGURACIÓN GLOBAL
 // ------------------------------------------------------------
-const MAX_ABS = 50; // Límite absoluto para ambos ejes
+const MAX_ABS = 50;
 const PRECISION = 2;
 
 // ------------------------------------------------------------
@@ -36,16 +36,53 @@ async function cargarEjercicios() {
 }
 
 // ------------------------------------------------------------
-// FUNCIONES DE CÁLCULO (con toFixed(1) para mostrar)
+// FUNCIONES DE CÁLCULO (MEJORADAS PARA RELACIONES)
 // ------------------------------------------------------------
 function obtenerCorteX(ex) {
   try {
     if (ex.tipo === 'producto') return "No aplica";
     if (ex.tipo === 'relacion') {
-      if (ex.forma === 'circulo') return "No hay (círculo)";
+      if (ex.forma === 'circulo') {
+        let r = Math.sqrt(ex.r2);
+        return `(${r.toFixed(1)},0) y (${-r.toFixed(1)},0)`;
+      }
       if (ex.forma.includes('y2')) {
-        let val = ex.forma === 'y2 = x+1' ? -1 : 1;
-        return `(${val},0)`;
+        // Analizar la expresión LaTeX para encontrar el corte con X (y=0)
+        let latex = ex.latex;
+        let match = latex.match(/y\^2\s*=\s*(.+)/);
+        if (match) {
+          let derecha = match[1].replace(/\s/g, '');
+          // Buscar un número que podría estar sumando o restando x
+          if (derecha.includes('x')) {
+            // Forma: x + c  o  c - x
+            if (derecha.includes('+')) {
+              let partes = derecha.split('+');
+              let c = partes.find(p => !p.includes('x'));
+              if (c) return `(${parseFloat(c)},0)`;
+            } else if (derecha.includes('-')) {
+              let partes = derecha.split('-');
+              // Puede ser "c - x" o "x - c"
+              if (partes[0].includes('x')) {
+                // x - c  => corte en x = c
+                let c = partes[1];
+                return `(${parseFloat(c)},0)`;
+              } else {
+                // c - x  => corte en x = c
+                let c = partes[0];
+                return `(${parseFloat(c)},0)`;
+              }
+            } else {
+              // Solo "x" (sin constante) o "x + constante" sin signo explícito
+              if (derecha === 'x') return "(0,0)";
+              // Si es algo como "x+1" ya se capturó en el caso '+'
+            }
+          } else {
+            // No hay x, entonces es y^2 = constante (como y^2=4) -> no corte con X (solo si constante=0)
+            if (parseFloat(derecha) === 0) return "(0,0)";
+            return "No hay";
+          }
+        }
+        return "No hay";
       }
       return "No hay";
     }
@@ -76,12 +113,6 @@ function obtenerCorteX(ex) {
       }
     }
     if (ex.tipo === 'exp') return "No hay";
-    if (ex.tipo === 'abs') {
-      if (ex.k === 0) return `(${ex.h},0)`;
-      if (-ex.k/ex.a < 0) return "No hay";
-      let d = Math.abs(-ex.k/ex.a);
-      return `(${(ex.h - d).toFixed(1)},0) y (${(ex.h + d).toFixed(1)},0)`;
-    }
     return "No disponible";
   } catch { return "Error"; }
 }
@@ -90,11 +121,47 @@ function obtenerCorteY(ex) {
   try {
     if (ex.tipo === 'producto') return "No aplica";
     if (ex.tipo === 'relacion') {
-      if (ex.forma === 'circulo') return `(0, ${Math.sqrt(ex.r2).toFixed(1)}) y (0, -${Math.sqrt(ex.r2).toFixed(1)})`;
+      if (ex.forma === 'circulo') {
+        let r = Math.sqrt(ex.r2);
+        return `(0, ${r.toFixed(1)}) y (0, -${r.toFixed(1)})`;
+      }
       if (ex.forma.includes('y2')) {
-        let a = ex.forma === 'y2 = x+1' ? 1 : -1;
-        if (a < 0) return "No hay";
-        return `(0, ${Math.sqrt(a).toFixed(1)}) y (0, -${Math.sqrt(a).toFixed(1)})`;
+        // Analizar la expresión para x=0
+        let latex = ex.latex;
+        let match = latex.match(/y\^2\s*=\s*(.+)/);
+        if (match) {
+          let derecha = match[1].replace(/\s/g, '');
+          // Evaluar en x=0
+          let valor;
+          if (derecha.includes('x')) {
+            if (derecha.includes('+')) {
+              let partes = derecha.split('+');
+              let c = partes.find(p => !p.includes('x'));
+              valor = c ? parseFloat(c) : 0;
+            } else if (derecha.includes('-')) {
+              let partes = derecha.split('-');
+              if (partes[0].includes('x')) {
+                // x - c => 0 - c = -c
+                let c = partes[1];
+                valor = -parseFloat(c);
+              } else {
+                // c - x => c - 0 = c
+                let c = partes[0];
+                valor = parseFloat(c);
+              }
+            } else {
+              // Solo x, entonces valor = 0
+              valor = 0;
+            }
+          } else {
+            // Constante pura
+            valor = parseFloat(derecha);
+          }
+          if (valor < 0) return "No hay";
+          let y = Math.sqrt(valor);
+          return `(0, ${y.toFixed(1)}) y (0, -${y.toFixed(1)})`;
+        }
+        return "No hay";
       }
     }
     if (ex.tipo === 'sqrt') {
@@ -115,10 +182,6 @@ function obtenerCorteY(ex) {
       let y = Math.pow(base, -ex.a) + (ex.desplazamientoV || 0);
       return `(0, ${y.toFixed(1)})`;
     }
-    if (ex.tipo === 'abs') {
-      let y = ex.a * Math.abs(0 - ex.h) + ex.k;
-      return `(0, ${y.toFixed(1)})`;
-    }
     return "No disponible";
   } catch { return "Error"; }
 }
@@ -129,12 +192,45 @@ function obtenerDominio(ex) {
     if (ex.reflexion) return `(-∞, ${ex.a}]`;
     else return `[${ex.a}, ∞)`;
   }
-  if (ex.tipo === 'lineal' || ex.tipo === 'quad' || ex.tipo === 'abs' || ex.tipo === 'exp') return "ℝ";
+  if (ex.tipo === 'lineal' || ex.tipo === 'quad' || ex.tipo === 'exp') return "ℝ";
   if (ex.tipo === 'relacion') {
-    if (ex.forma === 'circulo') return `[${-Math.sqrt(ex.r2).toFixed(1)}, ${Math.sqrt(ex.r2).toFixed(1)}]`;
+    if (ex.forma === 'circulo') {
+      let r = Math.sqrt(ex.r2);
+      return `[${-r.toFixed(1)}, ${r.toFixed(1)}]`;
+    }
     if (ex.forma.includes('y2')) {
-      let a = ex.forma === 'y2 = x+1' ? -1 : 1;
-      return a >= 0 ? `[${-a}, ∞)` : `(-∞, ${-a}]`;
+      // Analizar expresión para dominio (condición de no negatividad)
+      let latex = ex.latex;
+      let match = latex.match(/y\^2\s*=\s*(.+)/);
+      if (match) {
+        let derecha = match[1].replace(/\s/g, '');
+        if (derecha.includes('x')) {
+          if (derecha.includes('+')) {
+            let partes = derecha.split('+');
+            let c = partes.find(p => !p.includes('x'));
+            let limite = c ? -parseFloat(c) : 0;
+            return `[${limite.toFixed(1)}, ∞)`;
+          } else if (derecha.includes('-')) {
+            let partes = derecha.split('-');
+            if (partes[0].includes('x')) {
+              // x - c
+              let c = partes[1];
+              return `[${parseFloat(c).toFixed(1)}, ∞)`;
+            } else {
+              // c - x
+              let c = partes[0];
+              return `(-∞, ${parseFloat(c).toFixed(1)}]`;
+            }
+          } else {
+            // Solo x
+            return "[0, ∞)";
+          }
+        } else {
+          // Constante pura
+          return parseFloat(derecha) >= 0 ? "ℝ" : "∅";
+        }
+      }
+      return "ℝ";
     }
   }
   return "ℝ";
@@ -162,18 +258,22 @@ function obtenerRango(ex) {
     let desp = ex.desplazamientoV || 0;
     return `(${desp.toFixed(1)}, ∞)`;
   }
-  if (ex.tipo === 'abs') return `[${ex.k.toFixed(1)}, ∞)`;
   if (ex.tipo === 'relacion') {
-    if (ex.forma === 'circulo') return `[${-Math.sqrt(ex.r2).toFixed(1)}, ${Math.sqrt(ex.r2).toFixed(1)}]`;
-    if (ex.forma.includes('y2')) return "[0, ∞)";
+    if (ex.forma === 'circulo') {
+      let r = Math.sqrt(ex.r2);
+      return `[${-r.toFixed(1)}, ${r.toFixed(1)}]`;
+    }
+    if (ex.forma.includes('y2')) {
+      return "[0, ∞)";
+    }
   }
   return "ℝ";
 }
 
 function esFuncion(ex) {
-  if (ex.tipo === 'relacion' && (ex.forma === 'circulo' || ex.forma.includes('y2'))) return 1;
-  if (ex.tipo === 'producto') return 1;
-  return 0;
+  if (ex.tipo === 'relacion' && (ex.forma === 'circulo' || ex.forma.includes('y2'))) return 1; // No es función
+  if (ex.tipo === 'producto') return 1; // No es función (relación)
+  return 0; // Es función
 }
 
 function obtenerVertice(ex) {
@@ -193,29 +293,195 @@ function obtenerVertice(ex) {
 }
 
 // ------------------------------------------------------------
-// GENERAR PREGUNTAS (solo temas vistos)
+// FUNCIONES PARA PREGUNTAS CONCEPTUALES
+// ------------------------------------------------------------
+function obtenerExpresionDerecha(ex) {
+  return ex.latex.replace(/^y\s*=\s*/, '');
+}
+
+function obtenerRepresentacionComprension(ex) {
+  if (ex.tipo === 'producto') return null;
+  let dom = obtenerDominio(ex);
+  let ran = obtenerRango(ex);
+  let expr = obtenerExpresionDerecha(ex);
+  return `\\(F = \\{(x, y) : y = ${expr}, x \\in ${dom}, y \\in ${ran}\\}\\)`;
+}
+
+function puntoPertenece(ex, x, y) {
+  try {
+    switch (ex.tipo) {
+      case 'lineal':
+        return Math.abs(ex.m * x + ex.b - y) < 0.001;
+      case 'quad':
+        let yCalc = (ex.h !== undefined) ? ex.a * Math.pow(x - ex.h, 2) + ex.k : ex.a * x * x + ex.b * x + ex.c;
+        return Math.abs(yCalc - y) < 0.001;
+      case 'sqrt':
+        let arg = ex.reflexion ? ex.a - x : x - ex.a;
+        if (arg < 0) return false;
+        let yCalcSqrt = Math.sqrt(arg) + (ex.desplazamientoV || 0);
+        return Math.abs(yCalcSqrt - y) < 0.001;
+      case 'exp':
+        let base = ex.base === 'e' ? Math.E : ex.base;
+        let yCalcExp = Math.pow(base, x - ex.a) + (ex.desplazamientoV || 0);
+        return Math.abs(yCalcExp - y) < 0.001;
+      case 'relacion':
+        if (ex.forma === 'circulo') {
+          return Math.abs(x*x + y*y - ex.r2) < 0.001;
+        }
+        if (ex.forma.includes('y2')) {
+          let latex = ex.latex;
+          let match = latex.match(/y\^2\s*=\s*(.+)/);
+          if (match) {
+            let derecha = match[1].replace(/\s/g, '');
+            // Evaluar lado derecho en x
+            let valor;
+            if (derecha.includes('x')) {
+              if (derecha.includes('+')) {
+                let partes = derecha.split('+');
+                let c = partes.find(p => !p.includes('x'));
+                valor = x + (c ? parseFloat(c) : 0);
+              } else if (derecha.includes('-')) {
+                let partes = derecha.split('-');
+                if (partes[0].includes('x')) {
+                  // x - c
+                  let c = partes[1];
+                  valor = x - parseFloat(c);
+                } else {
+                  // c - x
+                  let c = partes[0];
+                  valor = parseFloat(c) - x;
+                }
+              } else {
+                // Solo x
+                valor = x;
+              }
+            } else {
+              valor = parseFloat(derecha);
+            }
+            return Math.abs(y*y - valor) < 0.001;
+          }
+        }
+        return false;
+      default: return false;
+    }
+  } catch { return false; }
+}
+
+function esCreciente(ex) {
+  if (ex.tipo === 'lineal') return ex.m > 0;
+  if (ex.tipo === 'sqrt') return !ex.reflexion;
+  if (ex.tipo === 'exp') {
+    let base = ex.base === 'e' ? Math.E : ex.base;
+    return base > 1;
+  }
+  return null;
+}
+
+function tieneMaximo(ex) {
+  if (ex.tipo === 'quad') return ex.a < 0;
+  return false;
+}
+
+function tieneMinimo(ex) {
+  if (ex.tipo === 'quad') return ex.a > 0;
+  if (ex.tipo === 'sqrt') return true;
+  return false;
+}
+
+// ------------------------------------------------------------
+// FUNCIÓN PARA NORMALIZAR OPCIONES
+// ------------------------------------------------------------
+function normalizarOpcion(opt) {
+  if (typeof opt !== 'string') return String(opt);
+  // Normalizar puntos como (x,y) → un decimal
+  let puntoMatch = opt.match(/^\(?\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)?$/);
+  if (puntoMatch) {
+    let x = parseFloat(puntoMatch[1]).toFixed(1);
+    let y = parseFloat(puntoMatch[2]).toFixed(1);
+    x = x.endsWith('.0') ? x.slice(0, -2) : x;
+    y = y.endsWith('.0') ? y.slice(0, -2) : y;
+    return `(${x}, ${y})`;
+  }
+  // Normalizar intervalos como [a,b] o (a,b)
+  let intervaloMatch = opt.match(/^([\[\(])\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*([\]\)])$/);
+  if (intervaloMatch) {
+    let ini = parseFloat(intervaloMatch[2]).toFixed(1);
+    let fin = parseFloat(intervaloMatch[3]).toFixed(1);
+    ini = ini.endsWith('.0') ? ini.slice(0, -2) : ini;
+    fin = fin.endsWith('.0') ? fin.slice(0, -2) : fin;
+    return `${intervaloMatch[1]}${ini}, ${fin}${intervaloMatch[4]}`;
+  }
+  // Normalizar números sueltos
+  if (!isNaN(parseFloat(opt)) && isFinite(opt)) {
+    let num = parseFloat(opt).toFixed(1);
+    return num.endsWith('.0') ? num.slice(0, -2) : num;
+  }
+  return opt;
+}
+
+// ------------------------------------------------------------
+// GENERAR PREGUNTAS (con opciones únicas)
 // ------------------------------------------------------------
 function generarPreguntasParaEjercicio(ex) {
   let preguntas = [];
 
+  function crearOpciones(baseOptions, correctValue) {
+    let normalizedCorrect = normalizarOpcion(correctValue);
+    let uniqueMap = new Map();
+    baseOptions.forEach(opt => {
+      let norm = normalizarOpcion(opt);
+      if (!uniqueMap.has(norm)) {
+        uniqueMap.set(norm, opt);
+      }
+    });
+    let opciones = Array.from(uniqueMap.values());
+    let correctIndex = opciones.findIndex(opt => normalizarOpcion(opt) === normalizedCorrect);
+    return { opciones, correcta: correctIndex };
+  }
+
   if (ex.tipo === 'producto') {
+    let A = ex.A, B = ex.B;
+    let producto = [];
+    A.forEach(a => B.forEach(b => producto.push(`(${a},${b})`)));
     preguntas.push({
       texto: "Cardinalidad de A × B",
-      opciones: [ex.A.length * ex.B.length + "", "|A|+|B|", "|A|", "|B|"],
+      opciones: [String(A.length * B.length), "|A|+|B|", "|A|", "|B|"],
       correcta: 0,
-      explicacion: `A tiene ${ex.A.length} elementos, B tiene ${ex.B.length}. |A×B| = ${ex.A.length} × ${ex.B.length} = ${ex.A.length * ex.B.length}.`
+      explicacion: `A tiene ${A.length} elementos, B tiene ${B.length}. |A×B| = ${A.length} × ${B.length} = ${A.length * B.length}.`
     });
+    let parSi = producto[0];
     preguntas.push({
-      texto: "¿El par (0,2) ∈ A × B?",
-      opciones: ["Verdadero", "Falso"],
-      correcta: (ex.A.includes(0) && ex.B.includes(2)) ? 0 : 1,
-      explicacion: (ex.A.includes(0) && ex.B.includes(2)) ? "0 ∈ A y 2 ∈ B, por tanto pertenece." : "0 no está en A o 2 no está en B."
+      texto: `¿El par ${parSi} pertenece a A × B?`,
+      opciones: ["Sí", "No"],
+      correcta: 0,
+      explicacion: `Sí, porque se forma con un elemento de A y otro de B.`
+    });
+    let parNo = `(${A[0]},${Math.max(...B)+1})`;
+    preguntas.push({
+      texto: `¿El par ${parNo} pertenece a A × B?`,
+      opciones: ["Sí", "No"],
+      correcta: 1,
+      explicacion: `No, porque el segundo elemento no está en B.`
     });
     preguntas.push({
       texto: "A ⊆ B",
       opciones: ["V", "F"],
-      correcta: ex.A.every(v => ex.B.includes(v)) ? 0 : 1,
-      explicacion: ex.A.every(v => ex.B.includes(v)) ? "Todos los elementos de A están en B." : "Hay elementos de A que no están en B."
+      correcta: A.every(v => B.includes(v)) ? 0 : 1,
+      explicacion: A.every(v => B.includes(v)) ? "Todos los elementos de A están en B." : "Hay elementos de A que no están en B."
+    });
+    let igual = (A.length === B.length) && A.every(v => B.includes(v)) && B.every(v => A.includes(v));
+    preguntas.push({
+      texto: "A × B es igual a B × A",
+      opciones: ["V", "F"],
+      correcta: igual ? 0 : 1,
+      explicacion: igual ? "Los conjuntos son iguales porque A = B." : "El producto cartesiano no es conmutativo, salvo que A = B."
+    });
+    let esFunc = (B.length === 1);
+    preguntas.push({
+      texto: "A × B representa una función de A en B",
+      opciones: ["V", "F"],
+      correcta: esFunc ? 0 : 1,
+      explicacion: esFunc ? "Cada elemento de A se relaciona con un único elemento de B." : "Cada elemento de A se relaciona con varios elementos de B, por lo que no es función."
     });
   } else {
     let cx = obtenerCorteX(ex);
@@ -223,32 +489,49 @@ function generarPreguntasParaEjercicio(ex) {
     let dom = obtenerDominio(ex);
     let ran = obtenerRango(ex);
     let func = esFuncion(ex);
+    let vertice = obtenerVertice(ex);
 
-    // Preguntas básicas
+    // Pregunta 1: Corte con X
+    let opcionesX = [cx, "(0,0)", "No hay", "(1,0)"];
+    let { opciones: opX, correcta: corrX } = crearOpciones(opcionesX, cx);
     preguntas.push({
       texto: "Punto de corte con eje X",
-      opciones: [cx, "(0,0)", "No hay", "(1,0)"],
-      correcta: 0,
+      opciones: opX,
+      correcta: corrX,
       explicacion: `Para hallar corte con X, hacemos y=0. Resolviendo se obtiene: ${cx}.`
     });
+
+    // Pregunta 2: Corte con Y
+    let opcionesY = [cy, "(0,0)", "No hay", "(0,1)"];
+    let { opciones: opY, correcta: corrY } = crearOpciones(opcionesY, cy);
     preguntas.push({
       texto: "Punto de corte con eje Y",
-      opciones: [cy, "(0,0)", "No hay", "(0,1)"],
-      correcta: 0,
+      opciones: opY,
+      correcta: corrY,
       explicacion: `Para hallar corte con Y, hacemos x=0. Se obtiene: ${cy}.`
     });
+
+    // Pregunta 3: Dominio
+    let opcionesDom = [dom, "ℝ", "[0,∞)", "(-∞,0]"];
+    let { opciones: opDom, correcta: corrDom } = crearOpciones(opcionesDom, dom);
     preguntas.push({
       texto: "Dominio (intervalo)",
-      opciones: [dom, "ℝ", "[0,∞)", "(-∞,0]"],
-      correcta: 0,
+      opciones: opDom,
+      correcta: corrDom,
       explicacion: `El dominio es ${dom}.`
     });
+
+    // Pregunta 4: Rango
+    let opcionesRan = [ran, "ℝ", "[0,∞)", "(-∞,0]"];
+    let { opciones: opRan, correcta: corrRan } = crearOpciones(opcionesRan, ran);
     preguntas.push({
       texto: "Rango (intervalo)",
-      opciones: [ran, "ℝ", "[0,∞)", "(-∞,0]"],
-      correcta: 0,
+      opciones: opRan,
+      correcta: corrRan,
       explicacion: `El rango es ${ran}.`
     });
+
+    // Pregunta 5: ¿Es función?
     preguntas.push({
       texto: "¿Representa una función?",
       opciones: ["Sí", "No"],
@@ -256,37 +539,129 @@ function generarPreguntasParaEjercicio(ex) {
       explicacion: func === 0 ? "Cada x tiene una única imagen." : "Hay valores de x con dos imágenes posibles."
     });
 
-    // Pregunta adicional para cuadráticas: vértice
-    if (ex.tipo === 'quad') {
-      let vertice = obtenerVertice(ex);
-      if (vertice) {
-        preguntas.push({
-          texto: "Coordenadas del vértice",
-          opciones: [vertice, "(0,0)", "No tiene vértice", "(1,1)"],
-          correcta: 0,
-          explicacion: `El vértice de la parábola es ${vertice}.`
-        });
-      }
+    // Pregunta 6: Vértice
+    if (vertice) {
+      let opcionesVert = [vertice, "(0,0)", "No tiene vértice", "(1,1)"];
+      let { opciones: opVert, correcta: corrVert } = crearOpciones(opcionesVert, vertice);
+      preguntas.push({
+        texto: "Coordenadas del vértice",
+        opciones: opVert,
+        correcta: corrVert,
+        explicacion: `El vértice es ${vertice}.`
+      });
     }
 
-    // Afirmaciones de verdadero/falso (sin inyectividad)
-    let afirmaciones = [
-      { texto: `El dominio es ${dom}`, correcta: 0 },
-      { texto: `El rango es ${ran}`, correcta: 0 },
-      { texto: `El punto de corte con X es ${cx}`, correcta: 0 },
-      { texto: `El punto de corte con Y es ${cy}`, correcta: 0 },
-      { texto: `¿Es función? ${func === 0 ? 'Sí' : 'No'}`, correcta: func }
-    ];
-
-    afirmaciones.forEach(af => {
+    // Pregunta 7: Representación por comprensión
+    let repr = obtenerRepresentacionComprension(ex);
+    if (repr) {
+      let domErr = dom === "ℝ" ? "[0,∞)" : "ℝ";
+      let ranErr = ran === "ℝ" ? "[0,∞)" : "ℝ";
+      let expr = obtenerExpresionDerecha(ex);
+      let opcionesRepr = [
+        repr,
+        `\\(F = \\{(x, y) : y = ${expr}, x \\in ${domErr}, y \\in ${ran}\\}\\)`,
+        `\\(F = \\{(x, y) : y = ${expr}, x \\in ${dom}, y \\in ${ranErr}\\}\\)`,
+        `\\(F = \\{(x, y) : x = ${expr}, y \\in ${dom}, x \\in ${ran}\\}\\)`
+      ];
+      let unicas = [...new Set(opcionesRepr)];
+      let correctIndex = unicas.indexOf(repr);
       preguntas.push({
-        texto: af.texto,
-        opciones: ["V", "F"],
-        correcta: af.correcta,
-        explicacion: "Afirmación basada en las propiedades calculadas."
+        texto: "Selecciona la representación por comprensión correcta de la función:",
+        opciones: unicas,
+        correcta: correctIndex,
+        explicacion: "La notación correcta debe incluir la ecuación y el dominio y rango adecuados."
       });
+    }
+
+    // Pregunta 8: Punto notable
+    let puntoNotable = null;
+    if (ex.tipo === 'lineal') puntoNotable = { x: 0, y: ex.b };
+    else if (ex.tipo === 'quad' && vertice) {
+      let coords = vertice.replace(/[()]/g,'').split(',').map(Number);
+      puntoNotable = { x: coords[0], y: coords[1] };
+    } else if (ex.tipo === 'sqrt') puntoNotable = { x: ex.a, y: ex.desplazamientoV || 0 };
+    else if (ex.tipo === 'exp') {
+      let base = ex.base === 'e' ? Math.E : ex.base;
+      puntoNotable = { x: 0, y: Math.pow(base, -ex.a) + (ex.desplazamientoV || 0) };
+    }
+    if (puntoNotable) {
+      preguntas.push({
+        texto: `¿El punto \\((${puntoNotable.x.toFixed(1)}, ${puntoNotable.y.toFixed(1)})\\) pertenece a la función?`,
+        opciones: ["Sí", "No"],
+        correcta: 0,
+        explicacion: "Sí, porque satisface la ecuación."
+      });
+    }
+
+    // Pregunta 9: Punto falso
+    let xFalso = 5, yFalso = 5;
+    preguntas.push({
+      texto: `¿El punto \\((${xFalso}, ${yFalso})\\) pertenece a la función?`,
+      opciones: ["Sí", "No"],
+      correcta: 1,
+      explicacion: "No, porque no satisface la ecuación."
+    });
+
+    // Pregunta 10: Máximo/mínimo
+    if (tieneMaximo(ex)) {
+      preguntas.push({
+        texto: "La función tiene un máximo",
+        opciones: ["V", "F"],
+        correcta: 0,
+        explicacion: "El coeficiente principal es negativo, por lo que la parábola abre hacia abajo y tiene un máximo en el vértice."
+      });
+    } else if (tieneMinimo(ex)) {
+      preguntas.push({
+        texto: "La función tiene un mínimo",
+        opciones: ["V", "F"],
+        correcta: 0,
+        explicacion: "El coeficiente principal es positivo (o es una raíz), por lo que tiene un mínimo."
+      });
+    }
+
+    // Pregunta 11: Monotonía
+    let crec = esCreciente(ex);
+    if (crec !== null) {
+      preguntas.push({
+        texto: "La función es creciente en todo su dominio",
+        opciones: ["V", "F"],
+        correcta: crec ? 0 : 1,
+        explicacion: crec ? "La pendiente es positiva (o base>1, o raíz sin reflexión)." : "La pendiente es negativa o la función decrece."
+      });
+    }
+
+    // Pregunta 12: Comparación con relación (solo para sqrt)
+    if (ex.tipo === 'sqrt') {
+      let expr = obtenerExpresionDerecha(ex).replace(/\\sqrt/g, '');
+      preguntas.push({
+        texto: `¿La ecuación \\(y^2 = ${expr}\\) es equivalente a la función?`,
+        opciones: ["Sí", "No"],
+        correcta: 1,
+        explicacion: "No, porque $y^2 = ...$ representa dos ramas, mientras que la función raíz cuadrada da solo la rama positiva."
+      });
+    }
+
+    // Pregunta 13: Pertenencia al dominio
+    let xTest = -2;
+    let perteneceDom = dom.includes('ℝ') || (dom.includes('[') && xTest >= parseFloat(dom.split(',')[0].replace('[',''))) || (dom.includes(']') && xTest <= parseFloat(dom.split(',')[1].replace(']','')));
+    preguntas.push({
+      texto: `¿El valor \\(x = ${xTest}\\) pertenece al dominio?`,
+      opciones: ["Sí", "No"],
+      correcta: perteneceDom ? 0 : 1,
+      explicacion: `El dominio es ${dom}, por lo tanto ${perteneceDom ? 'sí' : 'no'} pertenece.`
+    });
+
+    // Pregunta 14: Pertenencia al rango
+    let yTest = 0;
+    let perteneceRan = ran.includes('ℝ') || (ran.includes('[') && yTest >= parseFloat(ran.split(',')[0].replace('[',''))) || (ran.includes(']') && yTest <= parseFloat(ran.split(',')[1].replace(']','')));
+    preguntas.push({
+      texto: `¿El valor \\(y = ${yTest}\\) pertenece al rango?`,
+      opciones: ["Sí", "No"],
+      correcta: perteneceRan ? 0 : 1,
+      explicacion: `El rango es ${ran}, por lo tanto ${perteneceRan ? 'sí' : 'no'} pertenece.`
     });
   }
+
   return preguntas;
 }
 
@@ -312,12 +687,24 @@ function cargarEjercicio() {
   document.getElementById('mathDisplay').innerHTML = `\\( ${ex.latex} \\)`;
   if (window.MathJax) MathJax.typesetPromise();
 
+  // Ocultar/mostrar contenedor de gráfica según graficable
+  let chartContainer = document.querySelector('.chart-container');
+  if (ex.graficable) {
+    chartContainer.style.display = 'block';
+    generarGrafica();
+  } else {
+    chartContainer.style.display = 'none';
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+  }
+
   let preguntasBase = generarPreguntasParaEjercicio(ex);
   preguntasActuales = preguntasBase.map(p => {
     let opciones = [...p.opciones];
     let correctaOriginal = p.correcta;
     let valorCorrecto = opciones[correctaOriginal];
-    // Mezclar opciones
     for (let i = opciones.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [opciones[i], opciones[j]] = [opciones[j], opciones[i]];
@@ -332,12 +719,10 @@ function cargarEjercicio() {
   });
 
   renderizarPreguntas();
+  if (window.MathJax) MathJax.typesetPromise(); // Forzar renderizado de las nuevas preguntas
   respuestasUsuario = new Array(preguntasActuales.length).fill(null);
   document.getElementById('globalResult')?.classList.add('d-none');
   actualizarProgreso(0);
-
-  // Generar la gráfica automáticamente
-  generarGrafica();
 }
 
 function renderizarPreguntas() {
@@ -396,6 +781,10 @@ function verificarTodo() {
     }
   });
 
+  if (window.MathJax) {
+    MathJax.typesetPromise(); // Renderizar LaTeX en feedbacks
+  }
+
   let total = preguntasActuales.length;
   let porcentaje = Math.round(correctas / total * 100);
   let globalDiv = document.getElementById('globalResult');
@@ -424,7 +813,7 @@ function reiniciarTodo() {
 }
 
 // ------------------------------------------------------------
-// FUNCIONES AUXILIARES PARA GRÁFICAS MEJORADAS
+// FUNCIONES AUXILIARES PARA GRÁFICAS
 // ------------------------------------------------------------
 function calcularPuntosNotables(ex) {
   let puntos = [];
@@ -438,12 +827,39 @@ function calcularPuntosNotables(ex) {
         puntos.push({ x: 0, y: r, label: `(0,${r.toFixed(2)})` });
         puntos.push({ x: 0, y: -r, label: `(0,${-r.toFixed(2)})` });
       } else if (ex.forma.includes('y2')) {
-        let a = ex.forma === 'y2 = x+1' ? -1 : 1;
-        puntos.push({ x: a, y: 0, label: `(${a},0)` });
-        if (a <= 0) {
-          let y = Math.sqrt(-a);
-          puntos.push({ x: 0, y: y, label: `(0,${y.toFixed(2)})` });
-          puntos.push({ x: 0, y: -y, label: `(0,${-y.toFixed(2)})` });
+        // Calcular puntos notables analizando la ecuación
+        let latex = ex.latex;
+        let match = latex.match(/y\^2\s*=\s*(.+)/);
+        if (match) {
+          let derecha = match[1].replace(/\s/g, '');
+          // Vértice (inicio) de la parábola
+          if (derecha.includes('x')) {
+            if (derecha.includes('+')) {
+              let partes = derecha.split('+');
+              let c = partes.find(p => !p.includes('x'));
+              let a = c ? -parseFloat(c) : 0;
+              puntos.push({ x: a, y: 0, label: `(${a},0)` });
+            } else if (derecha.includes('-')) {
+              let partes = derecha.split('-');
+              if (partes[0].includes('x')) {
+                let c = parseFloat(partes[1]);
+                puntos.push({ x: c, y: 0, label: `(${c},0)` });
+              } else {
+                let c = parseFloat(partes[0]);
+                puntos.push({ x: c, y: 0, label: `(${c},0)` });
+              }
+            } else {
+              // Solo x
+              puntos.push({ x: 0, y: 0, label: "(0,0)" });
+            }
+          } else {
+            // Constante
+            let c = parseFloat(derecha);
+            if (c > 0) {
+              puntos.push({ x: 0, y: Math.sqrt(c), label: `(0,${Math.sqrt(c).toFixed(2)})` });
+              puntos.push({ x: 0, y: -Math.sqrt(c), label: `(0,${-Math.sqrt(c).toFixed(2)})` });
+            }
+          }
         }
       }
       return puntos;
@@ -508,138 +924,95 @@ function calcularPuntosNotables(ex) {
       puntos.push({ x: 0, y: y0, label: `(0,${y0.toFixed(2)})` });
       return puntos;
     }
-    if (ex.tipo === 'abs') {
-      let a = ex.a, h = ex.h, k = ex.k;
-      puntos.push({ x: h, y: k, label: `Vértice (${h.toFixed(2)},${k.toFixed(2)})` });
-      if (a !== 0) {
-        let d = Math.abs(-k / a);
-        if (d >= 0) {
-          if (k === 0) {
-            puntos.push({ x: h, y: 0, label: `(${h.toFixed(2)},0)` });
-          } else if (d > 0) {
-            puntos.push({ x: h - d, y: 0, label: `(${(h - d).toFixed(2)},0)` });
-            puntos.push({ x: h + d, y: 0, label: `(${(h + d).toFixed(2)},0)` });
-          }
-        }
-      }
-      let y0 = a * Math.abs(0 - h) + k;
-      puntos.push({ x: 0, y: y0, label: `(0,${y0.toFixed(2)})` });
-      return puntos;
-    }
   } catch (e) {
     console.error("Error calculando puntos notables", e);
   }
   return puntos;
 }
 
-/**
- * Calcula un rango dinámico para el eje X basado en puntos notables y el dominio.
- */
 function calcularLimitesX(ex, puntosNotables) {
-  // Recolectar puntos de interés
   let xs = [];
-
-  // Puntos notables
   puntosNotables.forEach(p => xs.push(p.x));
-
-  // Asegurar que el origen esté considerado
   xs.push(0);
-
-  // Puntos del dominio relevantes
-  if (ex.tipo === 'sqrt') {
-    xs.push(ex.a);
-  }
+  if (ex.tipo === 'sqrt') xs.push(ex.a);
   if (ex.tipo === 'relacion' && ex.forma === 'circulo') {
     let r = Math.sqrt(ex.r2);
     xs.push(-r, r);
   }
   if (ex.tipo === 'relacion' && ex.forma.includes('y2')) {
-    let a = ex.forma === 'y2 = x+1' ? -1 : 1;
-    xs.push(a);
+    let latex = ex.latex;
+    let match = latex.match(/y\^2\s*=\s*(.+)/);
+    if (match) {
+      let derecha = match[1].replace(/\s/g, '');
+      if (derecha.includes('x')) {
+        if (derecha.includes('+')) {
+          let partes = derecha.split('+');
+          let c = partes.find(p => !p.includes('x'));
+          let a = c ? -parseFloat(c) : 0;
+          xs.push(a);
+        } else if (derecha.includes('-')) {
+          let partes = derecha.split('-');
+          if (partes[0].includes('x')) {
+            let c = parseFloat(partes[1]);
+            xs.push(c);
+          } else {
+            let c = parseFloat(partes[0]);
+            xs.push(c);
+          }
+        } else {
+          xs.push(0);
+        }
+      }
+    }
   }
-
-  // Filtrar valores no finitos
   xs = xs.filter(x => isFinite(x) && !isNaN(x));
-
-  if (xs.length === 0) {
-    return { min: -10, max: 10 };
-  }
-
+  if (xs.length === 0) return { min: -10, max: 10 };
   let minX = Math.min(...xs);
   let maxX = Math.max(...xs);
-
-  // Añadir margen (20% o al menos 2 unidades)
   let padding = Math.max(2, (maxX - minX) * 0.2);
   minX -= padding;
   maxX += padding;
-
-  // Asegurar un ancho mínimo de 10 unidades
   if (maxX - minX < 10) {
     let center = (minX + maxX) / 2;
     minX = center - 5;
     maxX = center + 5;
   }
-
-  // Limitar a un rango sensato para evitar zoom excesivo
   minX = Math.max(-MAX_ABS, minX);
   maxX = Math.min(MAX_ABS, maxX);
-
-  // Redondear para consistencia
-  return {
-    min: redondear(minX),
-    max: redondear(maxX)
-  };
+  return { min: redondear(minX), max: redondear(maxX) };
 }
 
-/**
- * Calcula un rango dinámico para el eje Y basado en los datos de la función.
- */
 function calcularLimitesY(dataPrincipal, dataNegativa) {
   let ys = [];
   dataPrincipal.forEach(p => ys.push(p.y));
   dataNegativa.forEach(p => ys.push(p.y));
-  
   if (ys.length === 0) return { min: -10, max: 10 };
-
   let minY = Math.min(...ys);
   let maxY = Math.max(...ys);
-
-  // Añadir margen (20% o al menos 2 unidades)
   let padding = Math.max(2, (maxY - minY) * 0.2);
   minY -= padding;
   maxY += padding;
-
-  // Asegurar un ancho mínimo de 10 unidades
   if (maxY - minY < 10) {
     let center = (minY + maxY) / 2;
     minY = center - 5;
     maxY = center + 5;
   }
-
-  // Limitar a ±MAX_ABS
   minY = Math.max(-MAX_ABS, minY);
   maxY = Math.min(MAX_ABS, maxY);
-
-  return {
-    min: redondear(minY),
-    max: redondear(maxY)
-  };
+  return { min: redondear(minY), max: redondear(maxY) };
 }
 
 function generarGrafica() {
   let idx = parseInt(document.getElementById('exerciseSelect').value) || 0;
   if (ejercicios.length === 0) return;
   let ex = ejercicios[idx];
+  if (!ex.graficable) return; // No hacer nada si no es graficable
+
   let canvas = document.getElementById('mainChart');
   if (!canvas) return;
   let ctx = canvas.getContext('2d');
 
   if (chartInstance) chartInstance.destroy();
-
-  if (ex.tipo === 'producto') {
-    alert('Análisis de conjunto: A × B son puntos aislados.');
-    return;
-  }
 
   const puntosNotables = calcularPuntosNotables(ex);
   const limitesX = calcularLimitesX(ex, puntosNotables);
@@ -669,9 +1042,6 @@ function generarGrafica() {
           let argumento = ex.reflexion ? ex.a - x : x - ex.a;
           if (argumento >= 0) y = Math.sqrt(argumento) + (ex.desplazamientoV || 0);
           break;
-        case 'abs':
-          y = ex.a * Math.abs(x - ex.h) + ex.k;
-          break;
         case 'exp':
           let base = ex.base === 'e' ? Math.E : ex.base;
           y = Math.pow(base, x - ex.a) + (ex.desplazamientoV || 0);
@@ -684,29 +1054,46 @@ function generarGrafica() {
               yNeg = -Math.sqrt(r * r - x * x);
             }
           } else if (ex.forma.includes('y2')) {
-            let val = ex.forma === 'y2 = x+1' ? x + 1 : x - 1;
-            if (val >= 0) {
-              y = Math.sqrt(val);
-              yNeg = -Math.sqrt(val);
+            let latex = ex.latex;
+            let match = latex.match(/y\^2\s*=\s*(.+)/);
+            if (match) {
+              let derecha = match[1].replace(/\s/g, '');
+              let valor;
+              if (derecha.includes('x')) {
+                if (derecha.includes('+')) {
+                  let partes = derecha.split('+');
+                  let c = partes.find(p => !p.includes('x'));
+                  valor = x + (c ? parseFloat(c) : 0);
+                } else if (derecha.includes('-')) {
+                  let partes = derecha.split('-');
+                  if (partes[0].includes('x')) {
+                    let c = parseFloat(partes[1]);
+                    valor = x - c;
+                  } else {
+                    let c = parseFloat(partes[0]);
+                    valor = c - x;
+                  }
+                } else {
+                  valor = x;
+                }
+              } else {
+                valor = parseFloat(derecha);
+              }
+              if (valor >= 0) {
+                y = Math.sqrt(valor);
+                yNeg = -Math.sqrt(valor);
+              }
             }
           }
           break;
       }
     } catch (e) { y = null; }
 
-    // Solo almacenamos valores finitos (sin límite de Y aquí, se usará para calcular los límites después)
-    if (y !== null && isFinite(y)) {
-      dataPrincipal.push({ x: redondear(x), y: redondear(y) });
-    }
-    if (yNeg !== null && isFinite(yNeg)) {
-      dataNegativa.push({ x: redondear(x), y: redondear(yNeg) });
-    }
+    if (y !== null && isFinite(y)) dataPrincipal.push({ x: redondear(x), y: redondear(y) });
+    if (yNeg !== null && isFinite(yNeg)) dataNegativa.push({ x: redondear(x), y: redondear(yNeg) });
   }
 
-  // Calcular límites Y basados en los datos generados
   const limitesY = calcularLimitesY(dataPrincipal, dataNegativa);
-
-  // Filtrar puntos que quedarán fuera del rango Y después de calcular límites
   dataPrincipal = dataPrincipal.filter(p => p.y >= limitesY.min && p.y <= limitesY.max);
   dataNegativa = dataNegativa.filter(p => p.y >= limitesY.min && p.y <= limitesY.max);
 
@@ -733,7 +1120,6 @@ function generarGrafica() {
     });
   }
 
-  // Puntos notables
   if (puntosNotables.length > 0) {
     const puntosVisibles = puntosNotables
       .filter(p => p.y >= limitesY.min && p.y <= limitesY.max)
