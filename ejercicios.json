@@ -10,11 +10,11 @@
   { "latex": "y = \\sqrt{x - 2} - 1", "tipo": "sqrt", "a": 2, "desplazamientoV": -1, "reflexion": false, "graficable": true },
   { "latex": "y = \\sqrt{4 - x} + 2", "tipo": "sqrt", "a": 4, "desplazamientoV": 2, "reflexion": true, "graficable": true },
   { "latex": "y = \\sqrt{x + 1}", "tipo": "sqrt", "a": -1, "desplazamientoV": 0, "reflexion": false, "graficable": true },
-  { "latex": "y = \\frac{2}{3}x - 4", "tipo": "lineal", "m": 0.6667, "b": -4, "graficable": true },
-  { "latex": "y = -\\frac{3}{5}x + 2", "tipo": "lineal", "m": -0.6, "b": 2, "graficable": true },
-  { "latex": "y = 1.5x - 0.5", "tipo": "lineal", "m": 1.5, "b": -0.5, "graficable": true },
-  { "latex": "y = -0.75x + 1.25", "tipo": "lineal", "m": -0.75, "b": 1.25, "graficable": true },
-  { "latex": "y = \\frac{7}{2}x - 3", "tipo": "lineal", "m": 3.5, "b": -3, "graficable": true },
+  { "latex": "y = 2x - 1", "tipo": "lineal", "m": 2, "b": -1, "graficable": true },
+  { "latex": "y = -3x + 4", "tipo": "lineal", "m": -3, "b": 4, "graficable": true },
+  { "latex": "y = \\frac{1}{2}x + 2", "tipo": "lineal", "m": 0.5, "b": 2, "graficable": true },
+  { "latex": "y = -\\frac{3}{4}x + 1", "tipo": "lineal", "m": -0.75, "b": 1, "graficable": true },
+  { "latex": "y = \\frac{5}{2}x - 3", "tipo": "lineal", "m": 2.5, "b": -3, "graficable": true },
   { "latex": "y = \\frac{3}{\\sqrt{x}}", "tipo": "sqrt_frac", "num": 3, "a": 0, "desplazamientoV": 0, "reflexion": false, "graficable": true },
   { "latex": "y = \\frac{2}{\\sqrt{x - 1}} - 1", "tipo": "sqrt_frac", "num": 2, "a": 1, "desplazamientoV": -1, "reflexion": false, "graficable": true },
   { "latex": "y = \\frac{1}{x - 2}", "tipo": "racional", "num": 1, "a": 2, "desplazamientoV": 0, "reflexion": false, "graficable": true },
@@ -36,10 +36,7 @@
   { "latex": "x^2 + y^2 = 4", "tipo": "circunferencia", "centro": [0, 0], "radio": 2, "graficable": true },
   { "latex": "(x-1)^2 + (y+2)^2 = 9", "tipo": "circunferencia", "centro": [1, -2], "radio": 3, "graficable": true },
   { "latex": "\\frac{x^2}{4} + \\frac{y^2}{9} = 1", "tipo": "elipse", "centro": [0, 0], "a": 2, "b": 3, "graficable": true },
-  { "latex": "y = \\sqrt{x - 1.5} + 2.5", "tipo": "sqrt", "a": 1.5, "desplazamientoV": 2.5, "reflexion": false, "graficable": true },
-  { "latex": "y = \\frac{2}{x - 1.2} - 0.5", "tipo": "racional", "num": 2, "a": 1.2, "desplazamientoV": -0.5, "reflexion": false, "graficable": true },
-  { "latex": "y = 0.5x^2 - 1.5x + 2", "tipo": "quad", "a": 0.5, "b": -1.5, "c": 2, "graficable": true },
   { "latex": "y = 2x^2 + 3", "tipo": "quad", "a": 2, "b": 0, "c": 3, "graficable": true },
   { "latex": "y = -x^2 + 5", "tipo": "quad", "a": -1, "b": 0, "c": 5, "graficable": true },
-  { "latex": "y = 0.5x^2 - 2", "tipo": "quad", "a": 0.5, "b": 0, "c": -2, "graficable": true }
+  { "latex": "y = \\frac{1}{2}x^2 - 2", "tipo": "quad", "a": 0.5, "b": 0, "c": -2, "graficable": true }
 ]
